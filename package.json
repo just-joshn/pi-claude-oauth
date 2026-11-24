@@ -1,0 +1,37 @@
+{
+  "name": "pi-claude-oauth",
+  "version": "0.1.0",
+  "description": "Use Claude Pro, Max, and Ultra subscription OAuth tokens from Pi",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "claude",
+    "claude-code",
+    "oauth"
+  ],
+  "pi": {
+    "extensions": [
+      "./extensions/claude-oauth/index.ts"
+    ]
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "1.6.0",
+    "@earendil-works/pi-coding-agent": "1.6.0",
+    "@types/node": "^24.10.1",
+    "@vitest/coverage-v8": "^4.0.10",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.10"
+  }
+}
