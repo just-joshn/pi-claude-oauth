@@ -5,10 +5,10 @@ useTabs = false
 semi = true
 singleQuote = false
 trailingComma = "all"
+bracketSpacing = true
+arrowParens = "always"
+endOfLine = "lf"
+proseWrap = "preserve"
 sortImports = true
 sortPackageJson = true
-
-[test]
-root = "test"
-coverageThreshold = 0.8
-coverageSkipTestFiles = true
+ignorePatterns = ["dist/", "coverage/"]
