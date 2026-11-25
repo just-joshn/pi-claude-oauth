@@ -60,7 +60,7 @@ jobs:
       - run: bun run format:check
       - run: bun run lint
       - run: bun run typecheck
-      - run: bun run coverage
+      - run: bun run test:coverage
       - name: Pack npm tarball
         run: |
           mkdir -p "$RUNNER_TEMP/npm-package"

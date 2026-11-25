@@ -118,16 +118,17 @@ Documentation this follows:
 
 ## Development
 
-Use Bun 1.4.5 to install and format, and Node 24 to run the tests. Node runs the TypeScript
-sources directly, so there is no build step.
+Use Bun 1.4.5 to install and format, and Node 22.19 or later to run the tests. Pi loads the
+TypeScript sources directly, so there is no build step.
 
 ```bash
 bun install --frozen-lockfile
-bun run test           # node --test; use bun run test:watch while editing
-bun run coverage       # 80% minimum line/function coverage; fails on unloaded source files
+bun run test           # Vitest; use bun run test:watch while editing
+bun run test:coverage  # 80% minimum statement/branch/function/line coverage per source file
 bun run format         # apply formatting; use bun run format:check to check only
 bun run lint           # type-aware Oxlint
 bun run typecheck      # tsc --noEmit
+bun run check          # all of the checks above, as CI runs them
 pi -e .                # load this checkout in Pi
 ```
 
