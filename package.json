@@ -3,10 +3,6 @@
   "version": "0.1.0",
   "description": "Use Claude Pro, Max, and Ultra subscription OAuth tokens from Pi",
   "keywords": [
-    "claude",
-    "claude-code",
-    "oauth",
-    "pi-extension",
     "pi-package"
   ],
   "license": "MIT",
@@ -20,28 +16,34 @@
   ],
   "type": "module",
   "scripts": {
-    "test": "node --test",
-    "test:watch": "node --test --watch",
-    "coverage": "node scripts/coverage.ts",
     "format": "bun fmt",
     "format:check": "bun fmt --check",
-    "lint": "oxlint --type-aware",
-    "lint:fix": "oxlint --type-aware --fix",
-    "typecheck": "tsc --noEmit"
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "check": "bun run format:check && bun run lint && bun run typecheck && bun run test:coverage"
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "1.6.0",
     "@earendil-works/pi-coding-agent": "1.6.0",
     "@earendil-works/pi-tui": "1.6.0",
-    "@types/node": "^24.10.1",
+    "@types/node": "22",
+    "@vitest/coverage-v8": "^5.1.1",
     "oxlint": "^1.95.0",
     "oxlint-tsgolint": "^7.0.2008",
-    "typescript": "^7.0.2"
+    "typescript": "6",
+    "vitest": "^5.1.1"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",
     "@earendil-works/pi-tui": "*"
+  },
+  "engines": {
+    "node": ">=22.19.0"
   },
   "packageManager": "bun@1.4.5",
   "pi": {
