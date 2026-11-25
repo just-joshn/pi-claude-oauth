@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 
-import { ClaudeAuthError } from "./oauth";
+import { ClaudeAuthError } from "./oauth.ts";
 
 /**
  * Anthropic accepts any loopback port, so the preferred port keeps SSH and
@@ -150,7 +150,12 @@ export async function startLoopbackServer(options: LoopbackServerOptions): Promi
     closeListeners(servers);
     throw new ClaudeAuthError("Claude sign-in was cancelled.");
   }
-  const { promise, resolve, reject } = Promise.withResolvers<string>();
+  let resolve!: (code: string) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<string>((onCode, onError) => {
+    resolve = onCode;
+    reject = onError;
+  });
   // A sign-in that finishes by pasting never awaits this promise.
   promise.catch(() => {});
 

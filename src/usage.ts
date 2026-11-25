@@ -4,7 +4,7 @@ import {
   fetchJsonWithDeadline,
   type FetchLike,
   isRecord,
-} from "./oauth";
+} from "./oauth.ts";
 
 export const CLAUDE_USAGE_URL = "https://api.anthropic.com/api/oauth/usage";
 
@@ -20,7 +20,7 @@ const BUCKETS = [
 interface UsageBucket {
   readonly label: string;
   readonly utilization: number;
-  readonly resetsAt?: string;
+  readonly resetsAt?: string | undefined;
 }
 
 export interface UsageReport {
@@ -28,7 +28,7 @@ export interface UsageReport {
 }
 
 interface FetchUsageOptions {
-  readonly fetch?: FetchLike;
+  readonly fetch?: FetchLike | undefined;
   readonly timeoutMs?: number;
 }
 

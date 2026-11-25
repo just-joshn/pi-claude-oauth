@@ -42,7 +42,7 @@ export class ClaudeAuthError extends Error {
 
 export interface TokenPayload {
   readonly access: string;
-  readonly refresh?: string;
+  readonly refresh?: string | undefined;
   readonly expiresIn: number;
 }
 
@@ -63,14 +63,14 @@ interface AuthorizeUrlOptions {
 
 interface RequestOptions {
   readonly signal?: AbortSignal;
-  readonly fetch?: FetchLike;
+  readonly fetch?: FetchLike | undefined;
   readonly timeoutMs: number;
   readonly includeErrorBody?: boolean;
 }
 
 interface TokenRequestOptions {
   readonly signal: AbortSignal;
-  readonly fetch?: FetchLike;
+  readonly fetch?: FetchLike | undefined;
   readonly timeoutMs?: number;
 }
 
@@ -110,7 +110,10 @@ export function buildAuthorizeUrl(options: AuthorizeUrlOptions): string {
  * user can hand over: a full redirect URL, `code#state`, a query string, or a
  * bare authorization code.
  */
-export function parseAuthorizationInput(input: string): { code?: string; state?: string } {
+export function parseAuthorizationInput(input: string): {
+  code?: string | undefined;
+  state?: string | undefined;
+} {
   const value = input.trim();
   if (!value) return {};
 
@@ -166,7 +169,10 @@ export function parseTokenPayload(value: unknown): TokenPayload {
   return { access, refresh, expiresIn };
 }
 
-function failureDetails(payload: unknown): { code?: string; description?: string } {
+function failureDetails(payload: unknown): {
+  code?: string | undefined;
+  description?: string | undefined;
+} {
   if (!isRecord(payload)) return {};
   const description =
     typeof payload.error_description === "string" ? payload.error_description : undefined;

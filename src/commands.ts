@@ -1,9 +1,9 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 
-import { CLAUDE_CODE_OAUTH_TOKEN_ENV } from "./credential";
-import { CLAUDE_PROVIDER_ID, CLAUDE_PROVIDER_NAME } from "./models";
-import { isRecord } from "./oauth";
-import { fetchUsage, formatUsage, type UsageReport } from "./usage";
+import { CLAUDE_CODE_OAUTH_TOKEN_ENV } from "./credential.ts";
+import { CLAUDE_PROVIDER_ID, CLAUDE_PROVIDER_NAME } from "./models.ts";
+import { isRecord } from "./oauth.ts";
+import { fetchUsage, formatUsage, type UsageReport } from "./usage.ts";
 
 export const CLAUDE_CARD_TYPE = "claude-card";
 
@@ -63,10 +63,10 @@ export function isRenderableCard(value: unknown): value is Pick<CardData, "title
 
 interface StatusInput {
   readonly configured: boolean;
-  readonly source?: string;
+  readonly source?: string | undefined;
   readonly envToken: boolean;
   readonly modelCount: number;
-  readonly activeModel?: string;
+  readonly activeModel?: string | undefined;
 }
 
 const SOURCE_LABELS: Readonly<Record<string, string>> = {

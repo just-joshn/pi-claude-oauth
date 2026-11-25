@@ -7,10 +7,10 @@ import {
   isSetupTokenCredential,
   setupTokenRefreshError,
   toOAuthCredential,
-} from "./credential";
-import { login } from "./login";
-import { CLAUDE_PROVIDER_ID, CLAUDE_PROVIDER_NAME, claudeModels } from "./models";
-import { refreshAccessToken } from "./oauth";
+} from "./credential.ts";
+import { login } from "./login.ts";
+import { CLAUDE_PROVIDER_ID, CLAUDE_PROVIDER_NAME, claudeModels } from "./models.ts";
+import { refreshAccessToken } from "./oauth.ts";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com";
 
@@ -41,7 +41,11 @@ function claudeEnvToken(): ApiKeyAuth {
       signal.throwIfAborted();
       if (credential) {
         if (!credential.key) return undefined;
-        return { auth: { apiKey: credential.key }, env: credential.env, source: "Pi credential" };
+        return {
+          auth: { apiKey: credential.key },
+          ...(credential.env && { env: credential.env }),
+          source: "Pi credential",
+        };
       }
       const token = await ctx.env(CLAUDE_CODE_OAUTH_TOKEN_ENV);
       signal.throwIfAborted();
