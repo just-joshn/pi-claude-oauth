@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.1] - 2026-11-24
+
+### Changed
+
+- The extension ships from `src/` instead of `extensions/claude-oauth/`. Pi finds it through the package's
+  `pi.extensions` entry, so installs need no change.
+- The package declares Node.js 22.19 or later in `engines`.
+
+### Internal
+
+- Tests run on Vitest with 80% per-file coverage thresholds, and the extension type-checks under TypeScript 6
+  with stricter compiler and lint settings.
+- Added tests for the provider's saved credential `env`, cancellation and login delegation.
+
 ## [0.1.0] - 2026-11-24
 
 ### Added

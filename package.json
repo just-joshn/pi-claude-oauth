@@ -1,6 +1,6 @@
 {
   "name": "pi-claude-oauth",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Use Claude Pro, Max, and Ultra subscription OAuth tokens from Pi",
   "keywords": [
     "pi-package"
