@@ -150,12 +150,7 @@ export async function startLoopbackServer(options: LoopbackServerOptions): Promi
     closeListeners(servers);
     throw new ClaudeAuthError("Claude sign-in was cancelled.");
   }
-  let resolve!: (code: string) => void;
-  let reject!: (error: Error) => void;
-  const promise = new Promise<string>((onCode, onError) => {
-    resolve = onCode;
-    reject = onError;
-  });
+  const { promise, resolve, reject } = Promise.withResolvers<string>();
   // A sign-in that finishes by pasting never awaits this promise.
   promise.catch(() => {});
 

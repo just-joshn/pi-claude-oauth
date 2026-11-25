@@ -50,13 +50,13 @@ export interface CardData {
 export function isRenderableCard(value: unknown): value is Pick<CardData, "title" | "lines"> {
   return (
     isRecord(value) &&
-    typeof value.title === "string" &&
-    Array.isArray(value.lines) &&
-    value.lines.every(
+    typeof value["title"] === "string" &&
+    Array.isArray(value["lines"]) &&
+    value["lines"].every(
       (line: unknown) =>
         isRecord(line) &&
-        typeof line.text === "string" &&
-        (line.tone === undefined || CARD_TONES.some((tone) => tone === line.tone)),
+        typeof line["text"] === "string" &&
+        (line["tone"] === undefined || CARD_TONES.some((tone) => tone === line["tone"])),
     )
   );
 }

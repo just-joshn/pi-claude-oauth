@@ -41,11 +41,11 @@ export function parseUsage(value: unknown): UsageReport {
   for (const [key, label] of BUCKETS) {
     const raw = value[key];
     if (!isRecord(raw)) continue;
-    if (typeof raw.utilization !== "number" || !Number.isFinite(raw.utilization)) continue;
+    if (typeof raw["utilization"] !== "number" || !Number.isFinite(raw["utilization"])) continue;
     buckets.push({
       label,
-      utilization: clampPercent(raw.utilization),
-      resetsAt: typeof raw.resets_at === "string" ? raw.resets_at : undefined,
+      utilization: clampPercent(raw["utilization"]),
+      resetsAt: typeof raw["resets_at"] === "string" ? raw["resets_at"] : undefined,
     });
   }
 
