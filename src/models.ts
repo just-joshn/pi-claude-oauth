@@ -8,11 +8,7 @@ function withClaudeProvider<T extends { provider: string }>(entry: T) {
   return { ...entry, provider: CLAUDE_PROVIDER_ID };
 }
 
-/**
- * Subscription access covers the same models as the Anthropic API catalog.
- * Reuse Pi's generated catalog so context windows, output limits, thinking
- * levels, and compatibility flags stay correct as Pi ships new models.
- */
+/** Reuses Pi's Anthropic catalog so limits and compatibility flags track Pi releases. */
 export function claudeModels(): Model<"anthropic-messages">[] {
   return getBuiltinModels("anthropic").map((model) => {
     const copy = withClaudeProvider(model);
