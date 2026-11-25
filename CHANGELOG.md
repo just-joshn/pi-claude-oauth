@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2] - 2026-11-24
+
+### Internal
+
+- Simplified the network error handling in `src/oauth.ts` without changing the errors users see, made the
+  `TokenPayload` type private, and trimmed source comments to the constraints the code cannot express.
+
 ## [0.1.1] - 2026-11-24
 
 ### Changed
