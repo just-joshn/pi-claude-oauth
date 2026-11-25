@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it } from "vitest";
 
-import { statusCard } from "../extensions/claude-oauth/commands";
-import { type CardTheme, renderClaudeCard } from "../extensions/claude-oauth/ui";
+import { statusCard } from "../src/commands.ts";
+import { type CardTheme, renderClaudeCard } from "../src/ui.ts";
 
 const theme: CardTheme = {
   bold: (text) => `<b>${text}</b>`,

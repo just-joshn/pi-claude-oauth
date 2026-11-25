@@ -1,7 +1,7 @@
 import type { CustomEntry, EntryRenderOptions } from "@earendil-works/pi-coding-agent";
 import { Box, Text } from "@earendil-works/pi-tui";
 
-import { type CardTone, isRenderableCard } from "./commands";
+import { type CardTone, isRenderableCard } from "./commands.ts";
 
 export interface CardTheme {
   bold(text: string): string;

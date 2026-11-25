@@ -1,6 +1,5 @@
-import { afterEach, describe, expect, it, mock, spyOn } from "bun:test";
-
 import { getBuiltinModels } from "@earendil-works/pi-ai/providers/all";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   type CardData,
@@ -10,9 +9,9 @@ import {
   registerClaudeCommand,
   statusCard,
   usageCard,
-} from "../extensions/claude-oauth/commands";
-import { claudeModels } from "../extensions/claude-oauth/models";
-import { parseUsage } from "../extensions/claude-oauth/usage";
+} from "../src/commands.ts";
+import { claudeModels } from "../src/models.ts";
+import { parseUsage } from "../src/usage.ts";
 
 type Notification = { message: string; level: string };
 type Command = Parameters<CommandHost["registerCommand"]>[1];
@@ -67,7 +66,7 @@ function context(notifications: Notification[], overrides: CtxOverrides = {}): C
   };
 }
 
-afterEach(() => mock.restore());
+afterEach(() => vi.restoreAllMocks());
 
 describe("statusCard", () => {
   it("shows the saved sign-in and the active model", () => {
@@ -143,7 +142,9 @@ describe("/claude command", () => {
   });
 
   it("shows usage from the stored token", async () => {
-    spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ five_hour: { utilization: 30 } }));
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({ five_hour: { utilization: 30 } }),
+    );
     const { cards, notifications, command } = harness();
     await command.handler("usage", context(notifications));
 
@@ -177,7 +178,7 @@ describe("/claude command", () => {
   });
 
   it("reports usage failures", async () => {
-    spyOn(globalThis, "fetch").mockResolvedValue(Response.json({}, { status: 401 }));
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({}, { status: 401 }));
     const { cards, notifications, command } = harness();
     await command.handler("usage", context(notifications));
 

@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it } from "vitest";
 
-import { type FetchLike, refreshAccessToken } from "../extensions/claude-oauth/oauth";
-import { fetchUsage } from "../extensions/claude-oauth/usage";
+import { type FetchLike, refreshAccessToken } from "../src/oauth.ts";
+import { fetchUsage } from "../src/usage.ts";
 
 const pendingBody: FetchLike = async (_url, { signal }) =>
   new Response(
@@ -13,8 +13,8 @@ const pendingBody: FetchLike = async (_url, { signal }) =>
   );
 
 describe("after response headers arrive", () => {
-  it("reports a token body timeout rather than a malformed token", () => {
-    expect(
+  it("reports a token body timeout rather than a malformed token", async () => {
+    await expect(
       refreshAccessToken("fixture", {
         signal: new AbortController().signal,
         timeoutMs: 10,
@@ -23,13 +23,13 @@ describe("after response headers arrive", () => {
     ).rejects.toThrow(/did not answer/);
   });
 
-  it("reports a usage body timeout rather than malformed JSON", () => {
-    expect(fetchUsage("fixture", { timeoutMs: 10, fetch: pendingBody })).rejects.toThrow(
+  it("reports a usage body timeout rather than malformed JSON", async () => {
+    await expect(fetchUsage("fixture", { timeoutMs: 10, fetch: pendingBody })).rejects.toThrow(
       /did not answer/,
     );
   });
 
-  it("distinguishes caller cancellation from a body timeout", () => {
+  it("distinguishes caller cancellation from a body timeout", async () => {
     const caller = new AbortController();
     const token = refreshAccessToken("fixture", {
       signal: caller.signal,
@@ -39,10 +39,10 @@ describe("after response headers arrive", () => {
         return response;
       },
     });
-    expect(token).rejects.toThrow(/cancelled/);
+    await expect(token).rejects.toThrow(/cancelled/);
   });
 
-  it("reports a broken body stream as a transport error", () => {
+  it("reports a broken body stream as a transport error", async () => {
     const error = new TypeError("connection closed");
     const fetch: FetchLike = async () =>
       new Response(
@@ -52,6 +52,6 @@ describe("after response headers arrive", () => {
           },
         }),
       );
-    expect(fetchUsage("fixture", { fetch })).rejects.toThrow(/Could not reach/);
+    await expect(fetchUsage("fixture", { fetch })).rejects.toThrow(/Could not reach/);
   });
 });

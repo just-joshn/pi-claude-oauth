@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 
-import { ClaudeAuthError } from "./oauth";
+import { ClaudeAuthError } from "./oauth.ts";
 
 /**
  * Anthropic accepts any loopback port, so the preferred port keeps SSH and

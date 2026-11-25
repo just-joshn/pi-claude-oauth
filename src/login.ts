@@ -1,7 +1,15 @@
 import type { OAuthCredential, ProviderAuthInteraction } from "@earendil-works/pi-ai";
 
-import { DEFAULT_REDIRECT_URI, type LoopbackServer, startLoopbackServer } from "./callback-server";
-import { CLAUDE_CODE_OAUTH_TOKEN_ENV, setupTokenCredential, toOAuthCredential } from "./credential";
+import {
+  DEFAULT_REDIRECT_URI,
+  type LoopbackServer,
+  startLoopbackServer,
+} from "./callback-server.ts";
+import {
+  CLAUDE_CODE_OAUTH_TOKEN_ENV,
+  setupTokenCredential,
+  toOAuthCredential,
+} from "./credential.ts";
 import {
   type AuthorizationGrant,
   buildAuthorizeUrl,
@@ -11,7 +19,7 @@ import {
   exchangeAuthorizationCode,
   type FetchLike,
   parseAuthorizationInput,
-} from "./oauth";
+} from "./oauth.ts";
 
 export interface LoginDependencies {
   readonly fetch?: FetchLike;

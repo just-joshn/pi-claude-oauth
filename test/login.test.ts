@@ -1,14 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
-import { rejects } from "node:assert/strict";
 import { createHash } from "node:crypto";
 
 import type { AuthEvent, AuthPrompt, ProviderAuthInteraction } from "@earendil-works/pi-ai";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { login, type LoginDependencies } from "../extensions/claude-oauth/login";
-import {
-  CLAUDE_AUTHORIZE_URL,
-  CLAUDE_COPY_CODE_REDIRECT_URI,
-} from "../extensions/claude-oauth/oauth";
+import { login, type LoginDependencies } from "../src/login.ts";
+import { CLAUDE_AUTHORIZE_URL, CLAUDE_COPY_CODE_REDIRECT_URI } from "../src/oauth.ts";
 
 function interaction(method: string, answers: string[] = []) {
   const events: AuthEvent[] = [];
@@ -132,7 +128,7 @@ describe("login", () => {
         if (value === undefined) delete process.env[name];
         else process.env[name] = value;
         const { interaction: fake, prompts } = interaction("setup_token", ["sk-ant-oat01-decoy"]);
-        await rejects(login(fake), /CLAUDE_CODE_OAUTH_TOKEN/);
+        await expect(login(fake)).rejects.toThrow(/CLAUDE_CODE_OAUTH_TOKEN/);
         expect(prompts).toHaveLength(1);
       },
     );
@@ -159,22 +155,21 @@ describe("login", () => {
   it("rejects an initial exchange that cannot produce a refreshable credential", async () => {
     const { interaction: fake } = interaction("copy_code", ["the-code"]);
 
-    await rejects(
+    await expect(
       login(fake, {
         fetch: async () => Response.json({ access_token: "fixture", expires_in: 3600 }),
       }),
-      /did not include a refresh token/,
-    );
+    ).rejects.toThrow(/did not include a refresh token/);
   });
 
-  it("rejects a copy-code result from another sign-in request", () => {
+  it("rejects a copy-code result from another sign-in request", async () => {
     const { interaction: fake } = interaction("copy_code", ["the-code#other-state"]);
-    expect(login(fake)).rejects.toThrow(/different request/);
+    await expect(login(fake)).rejects.toThrow(/different request/);
   });
 
-  it("rejects an empty copy-code result", () => {
+  it("rejects an empty copy-code result", async () => {
     const { interaction: fake } = interaction("copy_code", ["   "]);
-    expect(login(fake)).rejects.toThrow(/No authorization code/);
+    await expect(login(fake)).rejects.toThrow(/No authorization code/);
   });
 
   it("exchanges the code from the local browser callback", async () => {
@@ -202,7 +197,7 @@ describe("login", () => {
 
   it("releases the listener before exchanging a manually entered browser code", async () => {
     const { interaction: fake } = interaction("browser", ["pasted-code"]);
-    const close = mock(() => {});
+    const close = vi.fn(() => {});
     await login(fake, {
       startServer: async () => ({
         redirectUri: "http://localhost:1234/callback",
@@ -244,12 +239,12 @@ describe("login", () => {
     });
 
     controller.abort();
-    await rejects(pending, /cancelled/i);
+    await expect(pending).rejects.toThrow(/cancelled/i);
     expect(events.some((event) => event.type === "auth_url")).toBe(false);
   });
 
-  it("rejects an unknown method", () => {
+  it("rejects an unknown method", async () => {
     const { interaction: fake } = interaction("bogus");
-    expect(login(fake)).rejects.toThrow(/Unknown Claude login method/);
+    await expect(login(fake)).rejects.toThrow(/Unknown Claude login method/);
   });
 });

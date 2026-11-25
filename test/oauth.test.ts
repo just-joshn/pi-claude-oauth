@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it } from "vitest";
 
 import {
   buildAuthorizeUrl,
@@ -13,7 +13,7 @@ import {
   parseAuthorizationInput,
   parseTokenPayload,
   refreshAccessToken,
-} from "../extensions/claude-oauth/oauth";
+} from "../src/oauth.ts";
 
 const signal = () => new AbortController().signal;
 
@@ -175,8 +175,8 @@ describe("exchangeAuthorizationCode", () => {
     });
   });
 
-  it("explains an invalid_grant so the user knows to sign in again", () => {
-    expect(
+  it("explains an invalid_grant so the user knows to sign in again", async () => {
+    await expect(
       exchangeAuthorizationCode(grant, {
         signal: signal(),
         fetch: async () => json({ error: "invalid_grant" }, 400),
@@ -184,14 +184,14 @@ describe("exchangeAuthorizationCode", () => {
     ).rejects.toThrow(/invalid_grant.*\/login claude/s);
   });
 
-  it("reports rate limiting", () => {
-    expect(
+  it("reports rate limiting", async () => {
+    await expect(
       exchangeAuthorizationCode(grant, { signal: signal(), fetch: async () => json({}, 429) }),
     ).rejects.toThrow(/rate limiting/);
   });
 
-  it("includes the provider error description without echoing the body", () => {
-    expect(
+  it("includes the provider error description without echoing the body", async () => {
+    await expect(
       exchangeAuthorizationCode(grant, {
         signal: signal(),
         fetch: async () =>
@@ -200,8 +200,8 @@ describe("exchangeAuthorizationCode", () => {
     ).rejects.toThrow("Claude sign-in failed (HTTP 400): invalid_request: bad redirect.");
   });
 
-  it("reads Anthropic's object-shaped error payloads", () => {
-    expect(
+  it("reads Anthropic's object-shaped error payloads", async () => {
+    await expect(
       exchangeAuthorizationCode(grant, {
         signal: signal(),
         fetch: async () =>
@@ -210,8 +210,8 @@ describe("exchangeAuthorizationCode", () => {
     ).rejects.toThrow(/invalid_grant.*\/login claude/s);
   });
 
-  it("survives a non-JSON error body", () => {
-    expect(
+  it("survives a non-JSON error body", async () => {
+    await expect(
       exchangeAuthorizationCode(grant, {
         signal: signal(),
         fetch: async () => new Response("<html>oops</html>", { status: 500 }),
@@ -219,8 +219,8 @@ describe("exchangeAuthorizationCode", () => {
     ).rejects.toThrow(/HTTP 500/);
   });
 
-  it("reports an unreachable token endpoint", () => {
-    expect(
+  it("reports an unreachable token endpoint", async () => {
+    await expect(
       exchangeAuthorizationCode(grant, {
         signal: signal(),
         fetch: async () => {
@@ -230,10 +230,10 @@ describe("exchangeAuthorizationCode", () => {
     ).rejects.toThrow(/Could not reach/);
   });
 
-  it("reports cancellation", () => {
+  it("reports cancellation", async () => {
     const controller = new AbortController();
     controller.abort();
-    expect(
+    await expect(
       exchangeAuthorizationCode(grant, {
         signal: controller.signal,
         fetch: async () => {
@@ -243,8 +243,8 @@ describe("exchangeAuthorizationCode", () => {
     ).rejects.toThrow(/cancelled/);
   });
 
-  it("reports a timeout", () => {
-    expect(
+  it("reports a timeout", async () => {
+    await expect(
       refreshAccessToken("refresh", {
         signal: signal(),
         timeoutMs: 5,
@@ -258,8 +258,8 @@ describe("exchangeAuthorizationCode", () => {
 });
 
 describe("refreshAccessToken", () => {
-  it("reports the caller's timeout signal as a timeout, not a cancellation", () => {
-    expect(
+  it("reports the caller's timeout signal as a timeout, not a cancellation", async () => {
+    await expect(
       refreshAccessToken("refresh", {
         signal: AbortSignal.timeout(5),
         fetch: (_input, init) =>
@@ -270,8 +270,8 @@ describe("refreshAccessToken", () => {
     ).rejects.toThrow(/did not answer/);
   });
 
-  it("redacts submitted secrets that the server echoes in an error", () => {
-    expect(
+  it("redacts submitted secrets that the server echoes in an error", async () => {
+    await expect(
       refreshAccessToken("sk-ant-ort01-refresh", {
         signal: signal(),
         fetch: async () =>

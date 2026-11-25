@@ -1,5 +1,4 @@
-import { describe, expect, it, mock } from "bun:test";
-import { rejects } from "node:assert/strict";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   CLAUDE_USAGE_URL,
@@ -7,7 +6,7 @@ import {
   formatResetTime,
   formatUsage,
   parseUsage,
-} from "../extensions/claude-oauth/usage";
+} from "../src/usage.ts";
 
 const response = (body: unknown, status = 200): Response =>
   new Response(typeof body === "string" ? body : JSON.stringify(body), { status });
@@ -95,39 +94,38 @@ describe("fetchUsage", () => {
     expect(report.buckets).toHaveLength(4);
   });
 
-  it("asks for a new sign-in when the token is rejected", () => {
-    expect(fetchUsage("token", { fetch: async () => response({}, 401) })).rejects.toThrow(
+  it("asks for a new sign-in when the token is rejected", async () => {
+    await expect(fetchUsage("token", { fetch: async () => response({}, 401) })).rejects.toThrow(
       /\/login claude/,
     );
   });
 
-  it("reports other HTTP failures", () => {
-    expect(fetchUsage("token", { fetch: async () => response({}, 503) })).rejects.toThrow(
+  it("reports other HTTP failures", async () => {
+    await expect(fetchUsage("token", { fetch: async () => response({}, 503) })).rejects.toThrow(
       /HTTP 503/,
     );
   });
 
   it("cancels an unused error body without masking the HTTP failure", async () => {
-    const cancellation = mock(async () => {
+    const cancellation = vi.fn(async () => {
       throw new Error("cleanup failure");
     });
     const body = new ReadableStream({ cancel: cancellation });
 
-    await rejects(
+    await expect(
       fetchUsage("fixture", { fetch: async () => new Response(body, { status: 503 }) }),
-      /HTTP 503/,
-    );
+    ).rejects.toThrow(/HTTP 503/);
     expect(cancellation).toHaveBeenCalledTimes(1);
   });
 
-  it("reports invalid JSON", () => {
-    expect(fetchUsage("token", { fetch: async () => response("<html>") })).rejects.toThrow(
+  it("reports invalid JSON", async () => {
+    await expect(fetchUsage("token", { fetch: async () => response("<html>") })).rejects.toThrow(
       /not valid JSON/,
     );
   });
 
-  it("reports an unreachable endpoint", () => {
-    expect(
+  it("reports an unreachable endpoint", async () => {
+    await expect(
       fetchUsage("token", {
         fetch: async () => {
           throw new Error("offline");
@@ -136,8 +134,8 @@ describe("fetchUsage", () => {
     ).rejects.toThrow(/Could not reach/);
   });
 
-  it("reports a timeout", () => {
-    expect(
+  it("reports a timeout", async () => {
+    await expect(
       fetchUsage("token", {
         timeoutMs: 5,
         fetch: (_input, init) =>

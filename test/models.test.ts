@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it } from "vitest";
 
-import { CLAUDE_PROVIDER_ID, claudeModels } from "../extensions/claude-oauth/models";
+import { CLAUDE_PROVIDER_ID, claudeModels } from "../src/models.ts";
 
 describe("claudeModels", () => {
   it("copies the Anthropic catalog so limits and thinking support stay current", () => {

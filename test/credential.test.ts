@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it } from "vitest";
 
 import {
   isSetupTokenCredential,
@@ -6,7 +6,7 @@ import {
   setupTokenCredential,
   setupTokenRefreshError,
   toOAuthCredential,
-} from "../extensions/claude-oauth/credential";
+} from "../src/credential.ts";
 
 describe("toOAuthCredential", () => {
   it("expires at the server deadline and leaves the early refresh to Pi", () => {

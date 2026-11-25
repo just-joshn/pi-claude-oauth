@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
-import { rejects } from "node:assert/strict";
 import { connect, createServer } from "node:net";
 import { networkInterfaces } from "node:os";
 
-import { startLoopbackServer } from "../extensions/claude-oauth/callback-server";
+import { describe, expect, it } from "vitest";
+
+import { startLoopbackServer } from "../src/callback-server.ts";
 
 const STATE = "state-123";
 
@@ -71,7 +71,7 @@ describe("startLoopbackServer", () => {
       `${server.redirectUri}?error=access_denied&error_description=nope&state=${STATE}`,
     );
     expect(response.status).toBe(400);
-    expect(waiting).rejects.toThrow(/declined: nope/);
+    await expect(waiting).rejects.toThrow(/declined: nope/);
   });
 
   it("keeps waiting when a request has no code", async () => {
@@ -102,7 +102,7 @@ describe("startLoopbackServer", () => {
   it("stops listening when closed", async () => {
     const server = await startLoopbackServer({ state: STATE, ports: [0] });
     server.close();
-    expect(fetch(`${server.redirectUri}?code=abc&state=${STATE}`)).rejects.toThrow();
+    await expect(fetch(`${server.redirectUri}?code=abc&state=${STATE}`)).rejects.toThrow();
   });
 
   it("rejects when the login is aborted", async () => {
@@ -114,7 +114,7 @@ describe("startLoopbackServer", () => {
     });
     const waiting = server.waitForCode();
     controller.abort();
-    expect(waiting).rejects.toThrow(/cancelled/);
+    await expect(waiting).rejects.toThrow(/cancelled/);
   });
 
   it("releases the port if the login is aborted while binding", async () => {
@@ -124,10 +124,7 @@ describe("startLoopbackServer", () => {
     const controller = new AbortController();
     const binding = startLoopbackServer({ state: STATE, ports: [port], signal: controller.signal });
     controller.abort();
-    await rejects(
-      binding.then((server) => server.close()),
-      /cancelled/,
-    );
+    await expect(binding.then((server) => server.close())).rejects.toThrow(/cancelled/);
     const next = await startLoopbackServer({ state: STATE, ports: [port] });
     next.close();
   });
@@ -149,10 +146,10 @@ describe("startLoopbackServer", () => {
     }
   });
 
-  it("refuses to start when already aborted", () => {
+  it("refuses to start when already aborted", async () => {
     const controller = new AbortController();
     controller.abort();
-    expect(
+    await expect(
       startLoopbackServer({ state: STATE, ports: [0], signal: controller.signal }),
     ).rejects.toThrow(/cancelled/);
   });
@@ -176,7 +173,7 @@ describe("startLoopbackServer", () => {
     try {
       const address = blocker.address();
       if (!address || typeof address === "string") throw new Error("Expected a TCP listener");
-      expect(startLoopbackServer({ state: "again", ports: [address.port] })).rejects.toThrow(
+      await expect(startLoopbackServer({ state: "again", ports: [address.port] })).rejects.toThrow(
         /Could not start/,
       );
     } finally {
@@ -186,6 +183,6 @@ describe("startLoopbackServer", () => {
 
   it("times out without a browser", async () => {
     const server = await startLoopbackServer({ state: STATE, ports: [0], timeoutMs: 10 });
-    expect(server.waitForCode()).rejects.toThrow(/timed out/);
+    await expect(server.waitForCode()).rejects.toThrow(/timed out/);
   });
 });

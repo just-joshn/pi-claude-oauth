@@ -1,11 +1,11 @@
-import { expect, it } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { DefaultResourceLoader, SettingsManager } from "@earendil-works/pi-coding-agent";
+import { expect, it } from "vitest";
 
-import claudeExtension from "../extensions/claude-oauth/index";
+import claudeExtension from "../src/index.ts";
 
 it("registers the Claude provider, command, and card renderer with Pi", async () => {
   const dir = await mkdtemp(join(tmpdir(), "claude-extension-smoke-"));

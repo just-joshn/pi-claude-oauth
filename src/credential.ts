@@ -1,6 +1,6 @@
 import type { OAuthCredential } from "@earendil-works/pi-ai";
 
-import { CLAUDE_TOKEN_PREFIX, ClaudeAuthError, type RefreshableTokenPayload } from "./oauth";
+import { CLAUDE_TOKEN_PREFIX, ClaudeAuthError, type RefreshableTokenPayload } from "./oauth.ts";
 
 export const CLAUDE_CODE_OAUTH_TOKEN_ENV = "CLAUDE_CODE_OAUTH_TOKEN";
 

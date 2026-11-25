@@ -42,7 +42,7 @@ export class ClaudeAuthError extends Error {
 
 export interface TokenPayload {
   readonly access: string;
-  readonly refresh?: string;
+  readonly refresh?: string | undefined;
   readonly expiresIn: number;
 }
 
@@ -63,14 +63,14 @@ interface AuthorizeUrlOptions {
 
 interface RequestOptions {
   readonly signal?: AbortSignal;
-  readonly fetch?: FetchLike;
+  readonly fetch?: FetchLike | undefined;
   readonly timeoutMs: number;
   readonly includeErrorBody?: boolean;
 }
 
 interface TokenRequestOptions {
   readonly signal: AbortSignal;
-  readonly fetch?: FetchLike;
+  readonly fetch?: FetchLike | undefined;
   readonly timeoutMs?: number;
 }
 
@@ -110,7 +110,10 @@ export function buildAuthorizeUrl(options: AuthorizeUrlOptions): string {
  * user can hand over: a full redirect URL, `code#state`, a query string, or a
  * bare authorization code.
  */
-export function parseAuthorizationInput(input: string): { code?: string; state?: string } {
+export function parseAuthorizationInput(input: string): {
+  code?: string | undefined;
+  state?: string | undefined;
+} {
   const value = input.trim();
   if (!value) return {};
 
@@ -141,42 +144,45 @@ export function parseAuthorizationInput(input: string): { code?: string; state?:
 export function parseTokenPayload(value: unknown): TokenPayload {
   if (!isRecord(value)) throw new ClaudeAuthError("Claude returned an unexpected token response.");
 
-  const access = value.access_token;
+  const access = value["access_token"];
   if (typeof access !== "string" || access.length === 0) {
     throw new ClaudeAuthError("Claude token response did not include an access token.");
   }
 
-  const tokenType = value.token_type;
+  const tokenType = value["token_type"];
   if (typeof tokenType === "string" && tokenType.toLowerCase() !== "bearer") {
     throw new ClaudeAuthError(`Claude token response used unsupported token type "${tokenType}".`);
   }
 
   const expiresIn =
-    typeof value.expires_in === "number" &&
-    Number.isFinite(value.expires_in) &&
-    value.expires_in > 0
-      ? value.expires_in
+    typeof value["expires_in"] === "number" &&
+    Number.isFinite(value["expires_in"]) &&
+    value["expires_in"] > 0
+      ? value["expires_in"]
       : DEFAULT_TOKEN_LIFETIME_SECONDS;
 
   const refresh =
-    typeof value.refresh_token === "string" && value.refresh_token.length > 0
-      ? value.refresh_token
+    typeof value["refresh_token"] === "string" && value["refresh_token"].length > 0
+      ? value["refresh_token"]
       : undefined;
 
   return { access, refresh, expiresIn };
 }
 
-function failureDetails(payload: unknown): { code?: string; description?: string } {
+function failureDetails(payload: unknown): {
+  code?: string | undefined;
+  description?: string | undefined;
+} {
   if (!isRecord(payload)) return {};
   const description =
-    typeof payload.error_description === "string" ? payload.error_description : undefined;
-  const error = payload.error;
+    typeof payload["error_description"] === "string" ? payload["error_description"] : undefined;
+  const error = payload["error"];
 
   if (typeof error === "string") return { code: error, description };
   if (isRecord(error)) {
     return {
-      code: typeof error.type === "string" ? error.type : undefined,
-      description: typeof error.message === "string" ? error.message : description,
+      code: typeof error["type"] === "string" ? error["type"] : undefined,
+      description: typeof error["message"] === "string" ? error["message"] : description,
     };
   }
   return { description };
