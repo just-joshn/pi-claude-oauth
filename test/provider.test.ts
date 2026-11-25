@@ -1,7 +1,14 @@
-import { afterEach, describe, expect, it, mock, spyOn } from "bun:test";
+import {
+  deepStrictEqual,
+  ok,
+  partialDeepStrictEqual,
+  rejects,
+  strictEqual,
+} from "node:assert/strict";
+import { afterEach, describe, it, mock } from "node:test";
 
-import { CLAUDE_CODE_OAUTH_TOKEN_ENV } from "../src/credential";
-import { claudeProvider } from "../src/provider";
+import { CLAUDE_CODE_OAUTH_TOKEN_ENV } from "../src/credential.ts";
+import { claudeProvider } from "../src/provider.ts";
 
 const signal = () => new AbortController().signal;
 
@@ -10,65 +17,65 @@ const authContext = (value: string | undefined) => ({
   fileExists: async () => false,
 });
 
-afterEach(() => mock.restore());
+afterEach(() => mock.restoreAll());
 
-describe("claudeProvider", () => {
-  it("registers a subscription provider with the Anthropic streaming implementation", () => {
+await describe("claudeProvider", async () => {
+  await it("registers a subscription provider with the Anthropic streaming implementation", () => {
     const provider = claudeProvider();
-    expect(provider.id).toBe("claude");
-    expect(provider.name).toBe("Claude (Pro/Max/Ultra)");
-    expect(provider.baseUrl).toBe("https://api.anthropic.com");
-    expect(provider.auth.oauth?.isSubscription).toBe(true);
-    expect(provider.auth.oauth?.name).toBe("Claude (Pro/Max/Ultra)");
-    expect(provider.getModels().length).toBeGreaterThan(10);
+    strictEqual(provider.id, "claude");
+    strictEqual(provider.name, "Claude (Pro/Max/Ultra)");
+    strictEqual(provider.baseUrl, "https://api.anthropic.com");
+    strictEqual(provider.auth.oauth?.isSubscription, true);
+    strictEqual(provider.auth.oauth.name, "Claude (Pro/Max/Ultra)");
+    ok(provider.getModels().length > 10);
   });
 
-  it("resolves the documented CLAUDE_CODE_OAUTH_TOKEN variable", async () => {
+  await it("resolves the documented CLAUDE_CODE_OAUTH_TOKEN variable", async () => {
     const apiKey = claudeProvider().auth.apiKey;
-    expect(typeof apiKey?.resolve).toBe("function");
+    strictEqual(typeof apiKey?.resolve, "function");
 
-    const resolved = await apiKey?.resolve?.({
+    const resolved = await apiKey?.resolve({
       ctx: authContext("sk-ant-oat01-token"),
       signal: signal(),
     });
-    expect(resolved).toEqual({
+    deepStrictEqual(resolved, {
       auth: { apiKey: "sk-ant-oat01-token" },
       source: CLAUDE_CODE_OAUTH_TOKEN_ENV,
     });
   });
 
-  it.each([undefined, "ambient-fixture"])(
-    "uses Pi's supplied key before the environment (%s)",
-    async (ambient) => {
-      const env = mock(async () => ambient);
+  for (const ambient of [undefined, "ambient-fixture"]) {
+    // oxlint-disable-next-line no-await-in-loop -- Registering a test inside a suite resolves immediately.
+    await it(`uses Pi's supplied key before the environment (${String(ambient)})`, async () => {
+      const env = mock.fn(async () => ambient);
       const resolved = await claudeProvider().auth.apiKey?.resolve({
         ctx: { ...authContext(ambient), env },
         credential: { type: "api_key", key: "explicit-fixture" },
         signal: signal(),
       });
-      expect(resolved?.auth.apiKey).toBe("explicit-fixture");
-      expect(env).not.toHaveBeenCalled();
-    },
-  );
+      strictEqual(resolved?.auth.apiKey, "explicit-fixture");
+      strictEqual(env.mock.callCount(), 0);
+    });
+  }
 
-  it("does not silently replace an empty Pi credential with an environment token", async () => {
+  await it("does not silently replace an empty Pi credential with an environment token", async () => {
     const resolved = await claudeProvider().auth.apiKey?.resolve({
       ctx: authContext("ambient-fixture"),
       credential: { type: "api_key", key: "" },
       signal: signal(),
     });
-    expect(resolved).toBeUndefined();
+    strictEqual(resolved, undefined);
   });
 
-  it("stays unconfigured without a stored credential or environment token", async () => {
-    const resolved = await claudeProvider().auth.apiKey?.resolve?.({
+  await it("stays unconfigured without a stored credential or environment token", async () => {
+    const resolved = await claudeProvider().auth.apiKey?.resolve({
       ctx: authContext(undefined),
       signal: signal(),
     });
-    expect(resolved).toBeUndefined();
+    strictEqual(resolved, undefined);
   });
 
-  it("hands the OAuth access token to Pi as an API key", async () => {
+  await it("hands the OAuth access token to Pi as an API key", async () => {
     const oauth = claudeProvider().auth.oauth;
     const auth = await oauth?.toAuth({
       type: "oauth",
@@ -76,11 +83,11 @@ describe("claudeProvider", () => {
       refresh: "r",
       expires: Date.now() + 1,
     });
-    expect(auth).toEqual({ apiKey: "sk-ant-oat01-token" });
+    deepStrictEqual(auth, { apiKey: "sk-ant-oat01-token" });
   });
 
-  it("refreshes a rotating Claude OAuth credential", async () => {
-    spyOn(globalThis, "fetch").mockResolvedValue(
+  await it("refreshes a rotating Claude OAuth credential", async () => {
+    mock.method(globalThis, "fetch", async () =>
       Response.json({
         access_token: "sk-ant-oat01-next",
         refresh_token: "refresh-2",
@@ -94,16 +101,16 @@ describe("claudeProvider", () => {
       signal(),
     );
 
-    expect(credential).toMatchObject({
+    partialDeepStrictEqual(credential, {
       type: "oauth",
       access: "sk-ant-oat01-next",
       refresh: "refresh-2",
     });
-    expect(credential?.expires).toBeGreaterThan(Date.now());
+    ok((credential?.expires ?? 0) > Date.now());
   });
 
-  it("retains the existing refresh token when the response omits a replacement", async () => {
-    spyOn(globalThis, "fetch").mockResolvedValue(
+  await it("retains the existing refresh token when the response omits a replacement", async () => {
+    mock.method(globalThis, "fetch", async () =>
       Response.json({ access_token: "sk-ant-oat01-next", expires_in: 3600 }),
     );
     const credential = await claudeProvider().auth.oauth?.refresh(
@@ -111,10 +118,10 @@ describe("claudeProvider", () => {
       signal(),
     );
 
-    expect(credential).toMatchObject({ access: "sk-ant-oat01-next", refresh: "refresh-1" });
+    partialDeepStrictEqual(credential, { access: "sk-ant-oat01-next", refresh: "refresh-1" });
   });
 
-  it("explains that setup tokens cannot be refreshed", () => {
+  await it("explains that setup tokens cannot be refreshed", async () => {
     const credential = {
       type: "oauth" as const,
       access: "sk-ant-oat01-token",
@@ -122,6 +129,7 @@ describe("claudeProvider", () => {
       expires: Date.now() - 1,
     };
     const oauth = claudeProvider().auth.oauth;
-    expect(oauth?.refresh(credential, signal())).rejects.toThrow(/cannot be refreshed/);
+    if (!oauth) throw new Error("expected OAuth auth");
+    await rejects(oauth.refresh(credential, signal()), /cannot be refreshed/);
   });
 });

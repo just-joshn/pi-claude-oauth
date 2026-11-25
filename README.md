@@ -118,11 +118,12 @@ Documentation this follows:
 
 ## Development
 
-Use Bun 1.4.5 for development. The extension still runs in Pi.
+Use Bun 1.4.5 to install and format, and Node 24 to run the tests. Node runs the TypeScript
+sources directly, so there is no build step.
 
 ```bash
 bun install --frozen-lockfile
-bun test               # run once; use bun test --watch while editing
+bun run test           # node --test; use bun run test:watch while editing
 bun run coverage       # 80% minimum line/function coverage; fails on unloaded source files
 bun run format         # apply formatting; use bun run format:check to check only
 bun run lint           # type-aware Oxlint

@@ -1,14 +1,17 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
-import { rejects } from "node:assert/strict";
+import {
+  deepStrictEqual,
+  ok,
+  partialDeepStrictEqual,
+  rejects,
+  strictEqual,
+} from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { afterEach, beforeEach, describe, it, mock } from "node:test";
 
 import type { AuthEvent, AuthPrompt, ProviderAuthInteraction } from "@earendil-works/pi-ai";
 
-import { login, type LoginDependencies } from "../src/login";
-import {
-  CLAUDE_AUTHORIZE_URL,
-  CLAUDE_COPY_CODE_REDIRECT_URI,
-} from "../src/oauth";
+import { login, type LoginDependencies } from "../src/login.ts";
+import { CLAUDE_AUTHORIZE_URL, CLAUDE_COPY_CODE_REDIRECT_URI } from "../src/oauth.ts";
 
 function interaction(method: string, answers: string[] = []) {
   const events: AuthEvent[] = [];
@@ -78,16 +81,17 @@ function expectPkceExchange(call: unknown, url: URL): void {
     throw new Error("Expected a PKCE verifier in the exchange");
   }
   const state = url.searchParams.get("state");
-  expect(state).toBeTruthy();
-  expect(call).toMatchObject({ state });
-  expect(url.href).not.toContain(call.code_verifier);
-  expect(url.searchParams.get("code_challenge")).toBe(
+  ok(state);
+  partialDeepStrictEqual(call, { state });
+  ok(!url.href.includes(call.code_verifier));
+  strictEqual(
+    url.searchParams.get("code_challenge"),
     createHash("sha256").update(call.code_verifier).digest("base64url"),
   );
 }
 
-describe("login", () => {
-  describe("setup-token import", () => {
+await describe("login", async () => {
+  await describe("setup-token import", async () => {
     const name = "CLAUDE_CODE_OAUTH_TOKEN";
     let previous: string | undefined;
     beforeEach(() => {
@@ -99,64 +103,66 @@ describe("login", () => {
       else process.env[name] = previous;
     });
 
-    it("offers browser, headless, and long-lived token methods", async () => {
+    await it("offers browser, headless, and long-lived token methods", async () => {
       const { interaction: fake, prompts } = interaction("setup_token", ["sk-ant-oat01-token"]);
       await login(fake);
 
       const select = prompts[0];
-      expect(select?.type).toBe("select");
+      strictEqual(select?.type, "select");
       if (select?.type !== "select") throw new Error("expected select");
-      expect(select.message).toContain("extra usage");
-      expect(select.options.map((option) => option.id)).toEqual([
-        "browser",
-        "copy_code",
-        "setup_token",
-      ]);
+      ok(select.message.includes("extra usage"));
+      deepStrictEqual(
+        select.options.map((option) => option.id),
+        ["browser", "copy_code", "setup_token"],
+      );
     });
 
-    it("imports the environment token without asking for it or displaying it", async () => {
+    await it("imports the environment token without asking for it or displaying it", async () => {
       const { interaction: fake, prompts, events } = interaction("setup_token", ["wrong-input"]);
       const credential = await login(fake);
-      expect(credential).toMatchObject({
+      partialDeepStrictEqual(credential, {
         type: "oauth",
         access: "sk-ant-oat01-env-fixture",
         refresh: "",
       });
-      expect(prompts.map((p) => p.type)).toEqual(["select"]);
-      expect(JSON.stringify([prompts, events])).not.toContain("sk-ant-oat01-env-fixture");
+      deepStrictEqual(
+        prompts.map((p) => p.type),
+        ["select"],
+      );
+      ok(!JSON.stringify([prompts, events]).includes("sk-ant-oat01-env-fixture"));
     });
 
-    it.each([undefined, "invalid"])(
-      "explains how to supply a valid environment token (%s)",
-      async (value) => {
+    for (const value of [undefined, "invalid"]) {
+      // oxlint-disable-next-line no-await-in-loop -- Registering a test inside a suite resolves immediately.
+      await it(`explains how to supply a valid environment token (${String(value)})`, async () => {
         if (value === undefined) delete process.env[name];
         else process.env[name] = value;
         const { interaction: fake, prompts } = interaction("setup_token", ["sk-ant-oat01-decoy"]);
         await rejects(login(fake), /CLAUDE_CODE_OAUTH_TOKEN/);
-        expect(prompts).toHaveLength(1);
-      },
-    );
+        strictEqual(prompts.length, 1);
+      });
+    }
   });
 
-  it("exchanges a pasted copy-code result", async () => {
+  await it("exchanges a pasted copy-code result", async () => {
     const { interaction: fake, events } = interaction("copy_code", ["the-code"]);
     const { calls, dependencies } = recordExchange();
 
     const credential = await login(fake, dependencies);
 
-    expect(credential.access).toBe("sk-ant-oat01-access");
-    expect(credential.refresh).toBe("refresh");
-    expect(calls[0]).toMatchObject({
+    strictEqual(credential.access, "sk-ant-oat01-access");
+    strictEqual(credential.refresh, "refresh");
+    partialDeepStrictEqual(calls[0], {
       grant_type: "authorization_code",
       code: "the-code",
       redirect_uri: CLAUDE_COPY_CODE_REDIRECT_URI,
     });
     expectPkceExchange(calls[0], authUrl(events));
-    expect(authUrl(events).searchParams.get("redirect_uri")).toBe(CLAUDE_COPY_CODE_REDIRECT_URI);
-    expect(authUrl(events).searchParams.get("code_challenge_method")).toBe("S256");
+    strictEqual(authUrl(events).searchParams.get("redirect_uri"), CLAUDE_COPY_CODE_REDIRECT_URI);
+    strictEqual(authUrl(events).searchParams.get("code_challenge_method"), "S256");
   });
 
-  it("rejects an initial exchange that cannot produce a refreshable credential", async () => {
+  await it("rejects an initial exchange that cannot produce a refreshable credential", async () => {
     const { interaction: fake } = interaction("copy_code", ["the-code"]);
 
     await rejects(
@@ -167,17 +173,17 @@ describe("login", () => {
     );
   });
 
-  it("rejects a copy-code result from another sign-in request", () => {
+  await it("rejects a copy-code result from another sign-in request", async () => {
     const { interaction: fake } = interaction("copy_code", ["the-code#other-state"]);
-    expect(login(fake)).rejects.toThrow(/different request/);
+    await rejects(login(fake), /different request/);
   });
 
-  it("rejects an empty copy-code result", () => {
+  await it("rejects an empty copy-code result", async () => {
     const { interaction: fake } = interaction("copy_code", ["   "]);
-    expect(login(fake)).rejects.toThrow(/No authorization code/);
+    await rejects(login(fake), /No authorization code/);
   });
 
-  it("exchanges the code from the local browser callback", async () => {
+  await it("exchanges the code from the local browser callback", async () => {
     const { interaction: fake, events } = interaction("browser");
     const { calls, dependencies } = recordExchange();
     const redirectUri = "http://localhost:53692/callback";
@@ -191,18 +197,18 @@ describe("login", () => {
       }),
     });
 
-    expect(credential.access).toBe("sk-ant-oat01-access");
+    strictEqual(credential.access, "sk-ant-oat01-access");
     const url = authUrl(events);
     expectPkceExchange(calls[0], url);
-    expect(calls[0]).toMatchObject({ code: "callback-code", redirect_uri: redirectUri });
-    expect(url.origin + url.pathname).toBe(CLAUDE_AUTHORIZE_URL);
-    expect(url.searchParams.get("redirect_uri")).toBe(redirectUri);
-    expect(url.searchParams.get("code")).toBe("true");
+    partialDeepStrictEqual(calls[0], { code: "callback-code", redirect_uri: redirectUri });
+    strictEqual(url.origin + url.pathname, CLAUDE_AUTHORIZE_URL);
+    strictEqual(url.searchParams.get("redirect_uri"), redirectUri);
+    strictEqual(url.searchParams.get("code"), "true");
   });
 
-  it("releases the listener before exchanging a manually entered browser code", async () => {
+  await it("releases the listener before exchanging a manually entered browser code", async () => {
     const { interaction: fake } = interaction("browser", ["pasted-code"]);
-    const close = mock(() => {});
+    const close = mock.fn(() => {});
     await login(fake, {
       startServer: async () => ({
         redirectUri: "http://localhost:1234/callback",
@@ -210,13 +216,13 @@ describe("login", () => {
         close,
       }),
       fetch: async () => {
-        expect(close).toHaveBeenCalled();
+        ok(close.mock.callCount() > 0);
         return tokenResponse();
       },
     });
   });
 
-  it("accepts a pasted redirect URL when no callback server can start", async () => {
+  await it("accepts a pasted redirect URL when no callback server can start", async () => {
     const { interaction: fake } = interaction("browser", [
       "http://localhost:53692/callback?code=pasted-code",
     ]);
@@ -229,13 +235,13 @@ describe("login", () => {
       },
     });
 
-    expect(calls[0]).toMatchObject({
+    partialDeepStrictEqual(calls[0], {
       code: "pasted-code",
       redirect_uri: "http://localhost:53692/callback",
     });
   });
 
-  it("cancels the login when the user aborts", async () => {
+  await it("cancels the login when the user aborts", async () => {
     const { interaction: fake, controller, events } = interaction("browser");
     const pending = login(fake, {
       startServer: async () => {
@@ -245,11 +251,14 @@ describe("login", () => {
 
     controller.abort();
     await rejects(pending, /cancelled/i);
-    expect(events.some((event) => event.type === "auth_url")).toBe(false);
+    strictEqual(
+      events.some((event) => event.type === "auth_url"),
+      false,
+    );
   });
 
-  it("rejects an unknown method", () => {
+  await it("rejects an unknown method", async () => {
     const { interaction: fake } = interaction("bogus");
-    expect(login(fake)).rejects.toThrow(/Unknown Claude login method/);
+    await rejects(login(fake), /Unknown Claude login method/);
   });
 });

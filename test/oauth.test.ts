@@ -1,4 +1,13 @@
-import { describe, expect, it } from "bun:test";
+import {
+  deepStrictEqual,
+  match,
+  notStrictEqual,
+  partialDeepStrictEqual,
+  rejects,
+  strictEqual,
+  throws,
+} from "node:assert/strict";
+import { describe, it } from "node:test";
 
 import {
   buildAuthorizeUrl,
@@ -10,10 +19,25 @@ import {
   ClaudeAuthError,
   createAuthorizationSession,
   exchangeAuthorizationCode,
+  type FetchLike,
   parseAuthorizationInput,
   parseTokenPayload,
   refreshAccessToken,
-} from "../src/oauth";
+} from "../src/oauth.ts";
+
+/** Like a real request, the pending socket keeps the process alive until the abort; Node unrefs `AbortSignal.timeout`. */
+const hangUntilAborted: FetchLike = (_url, { signal }) =>
+  new Promise((_resolve, reject) => {
+    const socket = setTimeout(() => {}, 60_000);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(socket);
+        reject(new Error("aborted"));
+      },
+      { once: true },
+    );
+  });
 
 const signal = () => new AbortController().signal;
 
@@ -34,8 +58,8 @@ const tokenBody = {
   token_type: "Bearer",
 };
 
-describe("buildAuthorizeUrl", () => {
-  it("carries every documented parameter", () => {
+await describe("buildAuthorizeUrl", async () => {
+  await it("carries every documented parameter", () => {
     const url = new URL(
       buildAuthorizeUrl({
         redirectUri: "http://localhost:53692/callback",
@@ -44,104 +68,103 @@ describe("buildAuthorizeUrl", () => {
       }),
     );
 
-    expect(`${url.origin}${url.pathname}`).toBe(CLAUDE_AUTHORIZE_URL);
-    expect(url.searchParams.get("code")).toBe("true");
-    expect(url.searchParams.get("client_id")).toBe(CLAUDE_CLIENT_ID);
-    expect(url.searchParams.get("response_type")).toBe("code");
-    expect(url.searchParams.get("redirect_uri")).toBe("http://localhost:53692/callback");
-    expect(url.searchParams.get("scope")).toBe(CLAUDE_SCOPES.join(" "));
-    expect(url.searchParams.get("code_challenge")).toBe("challenge-1");
-    expect(url.searchParams.get("code_challenge_method")).toBe("S256");
-    expect(url.searchParams.get("state")).toBe("state-1");
+    strictEqual(`${url.origin}${url.pathname}`, CLAUDE_AUTHORIZE_URL);
+    strictEqual(url.searchParams.get("code"), "true");
+    strictEqual(url.searchParams.get("client_id"), CLAUDE_CLIENT_ID);
+    strictEqual(url.searchParams.get("response_type"), "code");
+    strictEqual(url.searchParams.get("redirect_uri"), "http://localhost:53692/callback");
+    strictEqual(url.searchParams.get("scope"), CLAUDE_SCOPES.join(" "));
+    strictEqual(url.searchParams.get("code_challenge"), "challenge-1");
+    strictEqual(url.searchParams.get("code_challenge_method"), "S256");
+    strictEqual(url.searchParams.get("state"), "state-1");
   });
 });
 
-describe("createAuthorizationSession", () => {
-  it("creates a verifier and a matching S256 challenge", async () => {
+await describe("createAuthorizationSession", async () => {
+  await it("creates a verifier and a matching S256 challenge", async () => {
     const { verifier, challenge } = await createAuthorizationSession();
 
-    expect(verifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    match(verifier, /^[A-Za-z0-9_-]{43}$/);
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
     const expected = btoa(String.fromCharCode(...new Uint8Array(digest)))
       .replace(/\+/g, "-")
       .replace(/\//g, "_")
       .replace(/=+$/, "");
-    expect(challenge).toBe(expected);
+    strictEqual(challenge, expected);
   });
 
-  it("does not reuse a verifier", async () => {
+  await it("does not reuse a verifier", async () => {
     const first = await createAuthorizationSession();
     const second = await createAuthorizationSession();
-    expect(first.state).not.toBe(second.state);
-    expect(first.verifier).not.toBe(second.verifier);
+    notStrictEqual(first.state, second.state);
+    notStrictEqual(first.verifier, second.verifier);
   });
 });
 
-describe("parseAuthorizationInput", () => {
-  it("reads a full redirect URL", () => {
-    expect(
+await describe("parseAuthorizationInput", async () => {
+  await it("reads a full redirect URL", () => {
+    deepStrictEqual(
       parseAuthorizationInput("https://platform.claude.com/oauth/code/callback?code=abc&state=def"),
-    ).toEqual({
-      code: "abc",
-      state: "def",
-    });
+      { code: "abc", state: "def" },
+    );
   });
 
-  it("reads the code#state form Claude shows", () => {
-    expect(parseAuthorizationInput("abc#def")).toEqual({ code: "abc", state: "def" });
+  await it("reads the code#state form Claude shows", () => {
+    deepStrictEqual(parseAuthorizationInput("abc#def"), { code: "abc", state: "def" });
   });
 
-  it("reads a query string without a path", () => {
-    expect(parseAuthorizationInput("code=abc&state=def")).toEqual({ code: "abc", state: "def" });
+  await it("reads a query string without a path", () => {
+    deepStrictEqual(parseAuthorizationInput("code=abc&state=def"), { code: "abc", state: "def" });
   });
 
-  it("reads a bare code", () => {
-    expect(parseAuthorizationInput("  abc  ")).toEqual({ code: "abc" });
+  await it("reads a bare code", () => {
+    deepStrictEqual(parseAuthorizationInput("  abc  "), { code: "abc" });
   });
 
-  it("returns nothing for empty input", () => {
-    expect(parseAuthorizationInput("   ")).toEqual({});
+  await it("returns nothing for empty input", () => {
+    deepStrictEqual(parseAuthorizationInput("   "), {});
   });
 });
 
-describe("parseTokenPayload", () => {
-  it("accepts a bearer token response", () => {
-    expect(parseTokenPayload(tokenBody)).toEqual({
+await describe("parseTokenPayload", async () => {
+  await it("accepts a bearer token response", () => {
+    deepStrictEqual(parseTokenPayload(tokenBody), {
       access: "sk-ant-oat01-access",
       refresh: "sk-ant-ort01-refresh",
       expiresIn: 3600,
     });
   });
 
-  it("allows a refresh response without a new refresh token", () => {
-    expect(parseTokenPayload({ access_token: "a", expires_in: 60 })).toEqual({
+  await it("allows a refresh response without a new refresh token", () => {
+    deepStrictEqual(parseTokenPayload({ access_token: "a", expires_in: 60 }), {
       access: "a",
       refresh: undefined,
       expiresIn: 60,
     });
   });
 
-  it("assumes an hour when expiry is missing", () => {
-    expect(parseTokenPayload({ access_token: "a" }).expiresIn).toBe(3600);
+  await it("assumes an hour when expiry is missing", () => {
+    strictEqual(parseTokenPayload({ access_token: "a" }).expiresIn, 3600);
   });
 
-  it("rejects a non-object response", () => {
-    expect(() => parseTokenPayload("nope")).toThrow(ClaudeAuthError);
+  await it("rejects a non-object response", () => {
+    throws(() => parseTokenPayload("nope"), ClaudeAuthError);
   });
 
-  it("rejects a response without an access token", () => {
-    expect(() => parseTokenPayload({ refresh_token: "r" })).toThrow(/access token/);
+  await it("rejects a response without an access token", () => {
+    throws(() => parseTokenPayload({ refresh_token: "r" }), /access token/);
   });
 
-  it("rejects an unsupported token type", () => {
-    expect(() => parseTokenPayload({ access_token: "a", token_type: "mac" })).toThrow(
+  await it("rejects an unsupported token type", () => {
+    throws(
+      () => parseTokenPayload({ access_token: "a", token_type: "mac" }),
       /unsupported token type/,
     );
   });
 });
 
-describe("exchangeAuthorizationCode", () => {
-  it("posts the documented authorization_code grant", async () => {
+await describe("exchangeAuthorizationCode", async () => {
+  await it("posts the documented authorization_code grant", async () => {
     let captured: { url: string; body: unknown; headers: unknown } | undefined;
     const payload = await exchangeAuthorizationCode(
       {
@@ -159,9 +182,9 @@ describe("exchangeAuthorizationCode", () => {
       },
     );
 
-    expect(payload.access).toBe("sk-ant-oat01-access");
-    expect(captured?.url).toBe(CLAUDE_TOKEN_URL);
-    expect(captured?.body).toEqual({
+    strictEqual(payload.access, "sk-ant-oat01-access");
+    strictEqual(captured?.url, CLAUDE_TOKEN_URL);
+    deepStrictEqual(captured.body, {
       grant_type: "authorization_code",
       client_id: CLAUDE_CLIENT_ID,
       code: "abc",
@@ -169,109 +192,112 @@ describe("exchangeAuthorizationCode", () => {
       redirect_uri: "http://localhost:1/callback",
       code_verifier: "verifier",
     });
-    expect(captured?.headers).toMatchObject({
+    partialDeepStrictEqual(captured.headers, {
       "content-type": "application/json",
       accept: "application/json",
     });
   });
 
-  it("explains an invalid_grant so the user knows to sign in again", () => {
-    expect(
+  await it("explains an invalid_grant so the user knows to sign in again", async () => {
+    await rejects(
       exchangeAuthorizationCode(grant, {
         signal: signal(),
         fetch: async () => json({ error: "invalid_grant" }, 400),
       }),
-    ).rejects.toThrow(/invalid_grant.*\/login claude/s);
+      /invalid_grant.*\/login claude/s,
+    );
   });
 
-  it("reports rate limiting", () => {
-    expect(
+  await it("reports rate limiting", async () => {
+    await rejects(
       exchangeAuthorizationCode(grant, { signal: signal(), fetch: async () => json({}, 429) }),
-    ).rejects.toThrow(/rate limiting/);
+      /rate limiting/,
+    );
   });
 
-  it("includes the provider error description without echoing the body", () => {
-    expect(
+  await it("includes the provider error description without echoing the body", async () => {
+    await rejects(
       exchangeAuthorizationCode(grant, {
         signal: signal(),
         fetch: async () =>
           json({ error: "invalid_request", error_description: "bad redirect" }, 400),
       }),
-    ).rejects.toThrow("Claude sign-in failed (HTTP 400): invalid_request: bad redirect.");
+      { message: "Claude sign-in failed (HTTP 400): invalid_request: bad redirect." },
+    );
   });
 
-  it("reads Anthropic's object-shaped error payloads", () => {
-    expect(
+  await it("reads Anthropic's object-shaped error payloads", async () => {
+    await rejects(
       exchangeAuthorizationCode(grant, {
         signal: signal(),
         fetch: async () =>
           json({ error: { type: "invalid_grant", message: "Refresh token is invalid" } }, 400),
       }),
-    ).rejects.toThrow(/invalid_grant.*\/login claude/s);
+      /invalid_grant.*\/login claude/s,
+    );
   });
 
-  it("survives a non-JSON error body", () => {
-    expect(
+  await it("survives a non-JSON error body", async () => {
+    await rejects(
       exchangeAuthorizationCode(grant, {
         signal: signal(),
         fetch: async () => new Response("<html>oops</html>", { status: 500 }),
       }),
-    ).rejects.toThrow(/HTTP 500/);
+      /HTTP 500/,
+    );
   });
 
-  it("reports an unreachable token endpoint", () => {
-    expect(
+  await it("reports an unreachable token endpoint", async () => {
+    await rejects(
       exchangeAuthorizationCode(grant, {
         signal: signal(),
         fetch: async () => {
           throw new Error("getaddrinfo ENOTFOUND");
         },
       }),
-    ).rejects.toThrow(/Could not reach/);
+      /Could not reach/,
+    );
   });
 
-  it("reports cancellation", () => {
+  await it("reports cancellation", async () => {
     const controller = new AbortController();
     controller.abort();
-    expect(
+    await rejects(
       exchangeAuthorizationCode(grant, {
         signal: controller.signal,
         fetch: async () => {
           throw new Error("aborted");
         },
       }),
-    ).rejects.toThrow(/cancelled/);
+      /cancelled/,
+    );
   });
 
-  it("reports a timeout", () => {
-    expect(
+  await it("reports a timeout", async () => {
+    await rejects(
       refreshAccessToken("refresh", {
         signal: signal(),
         timeoutMs: 5,
-        fetch: (_input, init) =>
-          new Promise((_resolve, reject) => {
-            init?.signal?.addEventListener("abort", () => reject(new Error("aborted")));
-          }),
+        fetch: hangUntilAborted,
       }),
-    ).rejects.toThrow(/did not answer/);
+      /did not answer/,
+    );
   });
 });
 
-describe("refreshAccessToken", () => {
-  it("reports the caller's timeout signal as a timeout, not a cancellation", () => {
-    expect(
+await describe("refreshAccessToken", async () => {
+  await it("reports the caller's timeout signal as a timeout, not a cancellation", async () => {
+    await rejects(
       refreshAccessToken("refresh", {
         signal: AbortSignal.timeout(5),
-        fetch: (_input, init) =>
-          new Promise((_resolve, reject) => {
-            init?.signal?.addEventListener("abort", () => reject(new Error("aborted")));
-          }),
+        fetch: hangUntilAborted,
       }),
-    ).rejects.toThrow(/did not answer/);
+      /did not answer/,
+    );
   });
 
-  it("redacts submitted secrets that the server echoes in an error", () => {
-    expect(
+  await it("redacts submitted secrets that the server echoes in an error", async () => {
+    await rejects(
       refreshAccessToken("sk-ant-ort01-refresh", {
         signal: signal(),
         fetch: async () =>
@@ -283,14 +309,15 @@ describe("refreshAccessToken", () => {
             400,
           ),
       }),
-    ).rejects.toThrow(
-      "Claude sign-in failed (HTTP 400): invalid_request: bad refresh_token=[redacted].",
+      {
+        message: "Claude sign-in failed (HTTP 400): invalid_request: bad refresh_token=[redacted].",
+      },
     );
   });
 });
 
-describe("copy code redirect", () => {
-  it("matches the Claude Code manual redirect", () => {
-    expect(CLAUDE_COPY_CODE_REDIRECT_URI).toBe("https://platform.claude.com/oauth/code/callback");
+await describe("copy code redirect", async () => {
+  await it("matches the Claude Code manual redirect", () => {
+    strictEqual(CLAUDE_COPY_CODE_REDIRECT_URI, "https://platform.claude.com/oauth/code/callback");
   });
 });
