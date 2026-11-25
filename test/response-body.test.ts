@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
-import { type FetchLike, refreshAccessToken } from "../extensions/claude-oauth/oauth";
-import { fetchUsage } from "../extensions/claude-oauth/usage";
+import { type FetchLike, refreshAccessToken } from "../src/oauth";
+import { fetchUsage } from "../src/usage";
 
 const pendingBody: FetchLike = async (_url, { signal }) =>
   new Response(

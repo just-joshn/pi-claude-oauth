@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { DefaultResourceLoader, SettingsManager } from "@earendil-works/pi-coding-agent";
 
-import claudeExtension from "../extensions/claude-oauth/index";
+import claudeExtension from "../src/index";
 
 it("registers the Claude provider, command, and card renderer with Pi", async () => {
   const dir = await mkdtemp(join(tmpdir(), "claude-extension-smoke-"));

@@ -15,7 +15,7 @@
     "url": "git+https://github.com/just-joshn/pi-claude-oauth.git"
   },
   "files": [
-    "extensions/claude-oauth/",
+    "src/",
     "CHANGELOG.md"
   ],
   "type": "module",
@@ -47,7 +47,7 @@
   "packageManager": "bun@1.4.5",
   "pi": {
     "extensions": [
-      "./extensions/claude-oauth/index.ts"
+      "./src/index.ts"
     ]
   }
 }

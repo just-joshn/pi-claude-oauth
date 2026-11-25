@@ -10,9 +10,9 @@ import {
   registerClaudeCommand,
   statusCard,
   usageCard,
-} from "../extensions/claude-oauth/commands";
-import { claudeModels } from "../extensions/claude-oauth/models";
-import { parseUsage } from "../extensions/claude-oauth/usage";
+} from "../src/commands";
+import { claudeModels } from "../src/models";
+import { parseUsage } from "../src/usage";
 
 type Notification = { message: string; level: string };
 type Command = Parameters<CommandHost["registerCommand"]>[1];

@@ -6,7 +6,7 @@ import {
   setupTokenCredential,
   setupTokenRefreshError,
   toOAuthCredential,
-} from "../extensions/claude-oauth/credential";
+} from "../src/credential";
 
 describe("toOAuthCredential", () => {
   it("expires at the server deadline and leaves the early refresh to Pi", () => {

@@ -4,11 +4,11 @@ import { createHash } from "node:crypto";
 
 import type { AuthEvent, AuthPrompt, ProviderAuthInteraction } from "@earendil-works/pi-ai";
 
-import { login, type LoginDependencies } from "../extensions/claude-oauth/login";
+import { login, type LoginDependencies } from "../src/login";
 import {
   CLAUDE_AUTHORIZE_URL,
   CLAUDE_COPY_CODE_REDIRECT_URI,
-} from "../extensions/claude-oauth/oauth";
+} from "../src/oauth";
 
 function interaction(method: string, answers: string[] = []) {
   const events: AuthEvent[] = [];

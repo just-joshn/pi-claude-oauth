@@ -94,7 +94,7 @@ Anthropic's consumer terms and usage settings before relying on it for daily wor
 
 ## Protocol reference
 
-The constants in `extensions/claude-oauth/oauth.ts` mirror Claude Code 2.1.331:
+The constants in `src/oauth.ts` mirror Claude Code 2.1.331:
 
 | Item            | Value                                                                               |
 | --------------- | ----------------------------------------------------------------------------------- |
@@ -133,7 +133,7 @@ pi -e .                # load this checkout in Pi
 Layout:
 
 ```
-extensions/claude-oauth/
+src/
   index.ts            extension entry: provider, card renderer, /claude command
   provider.ts         native Pi provider with OAuth and ambient token auth
   login.ts            browser, copy-code, and setup-token login methods

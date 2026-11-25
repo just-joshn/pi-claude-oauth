@@ -7,7 +7,7 @@ import {
   formatResetTime,
   formatUsage,
   parseUsage,
-} from "../extensions/claude-oauth/usage";
+} from "../src/usage";
 
 const response = (body: unknown, status = 200): Response =>
   new Response(typeof body === "string" ? body : JSON.stringify(body), { status });

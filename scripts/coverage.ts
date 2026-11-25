@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-const SOURCE_GLOB = "extensions/claude-oauth/**/*.ts";
+const SOURCE_GLOB = "src/**/*.ts";
 
 async function checkCoverage(dir: string): Promise<number> {
   const run = Bun.spawnSync(

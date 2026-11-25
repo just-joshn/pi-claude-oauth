@@ -3,7 +3,7 @@ import { rejects } from "node:assert/strict";
 import { connect, createServer } from "node:net";
 import { networkInterfaces } from "node:os";
 
-import { startLoopbackServer } from "../extensions/claude-oauth/callback-server";
+import { startLoopbackServer } from "../src/callback-server";
 
 const STATE = "state-123";
 

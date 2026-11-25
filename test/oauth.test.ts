@@ -13,7 +13,7 @@ import {
   parseAuthorizationInput,
   parseTokenPayload,
   refreshAccessToken,
-} from "../extensions/claude-oauth/oauth";
+} from "../src/oauth";
 
 const signal = () => new AbortController().signal;
 

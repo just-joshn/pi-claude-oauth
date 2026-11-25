@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, mock, spyOn } from "bun:test";
 
-import { CLAUDE_CODE_OAUTH_TOKEN_ENV } from "../extensions/claude-oauth/credential";
-import { claudeProvider } from "../extensions/claude-oauth/provider";
+import { CLAUDE_CODE_OAUTH_TOKEN_ENV } from "../src/credential";
+import { claudeProvider } from "../src/provider";
 
 const signal = () => new AbortController().signal;
 
