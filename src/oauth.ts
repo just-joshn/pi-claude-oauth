@@ -40,7 +40,7 @@ export class ClaudeAuthError extends Error {
   }
 }
 
-export interface TokenPayload {
+interface TokenPayload {
   readonly access: string;
   readonly refresh?: string | undefined;
   readonly expiresIn: number;
@@ -240,15 +240,14 @@ export async function fetchJsonWithDeadline(
     }
     return { ok: response.ok, status: response.status, payload: parseJson(await response.text()) };
   } catch (error) {
+    if (!signal.aborted) throw new ClaudeAuthError(`Could not reach ${url}.`, { cause: error });
     // Pi bounds a refresh with `AbortSignal.timeout`, so an aborted caller signal is not always a user cancel.
-    if (signal.aborted && !isTimeout(signal))
-      throw new ClaudeAuthError("Claude sign-in was cancelled.", { cause: error });
-    if (signal.aborted) {
+    if (isTimeout(signal)) {
       throw new ClaudeAuthError(`Claude did not answer ${url} in time. Try again.`, {
         cause: error,
       });
     }
-    throw new ClaudeAuthError(`Could not reach ${url}.`, { cause: error });
+    throw new ClaudeAuthError("Claude sign-in was cancelled.", { cause: error });
   }
 }
 

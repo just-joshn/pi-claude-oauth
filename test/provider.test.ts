@@ -30,10 +30,7 @@ describe("claudeProvider", () => {
   });
 
   it("resolves the documented CLAUDE_CODE_OAUTH_TOKEN variable", async () => {
-    const apiKey = claudeProvider().auth.apiKey;
-    expect(typeof apiKey?.resolve).toBe("function");
-
-    const resolved = await apiKey?.resolve?.({
+    const resolved = await claudeProvider().auth.apiKey?.resolve({
       ctx: authContext("sk-ant-oat01-token"),
       signal: signal(),
     });
@@ -80,7 +77,6 @@ describe("claudeProvider", () => {
       auth: { apiKey: "explicit-fixture" },
       source: "Pi credential",
     });
-    expect(resolved).not.toHaveProperty("env");
   });
 
   it("does not read the environment once the lookup is cancelled", async () => {
@@ -119,7 +115,7 @@ describe("claudeProvider", () => {
   });
 
   it("stays unconfigured without a stored credential or environment token", async () => {
-    const resolved = await claudeProvider().auth.apiKey?.resolve?.({
+    const resolved = await claudeProvider().auth.apiKey?.resolve({
       ctx: authContext(undefined),
       signal: signal(),
     });

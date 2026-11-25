@@ -42,7 +42,8 @@ function harness() {
   const [command] = commands;
   if (!command) throw new Error("command was not registered");
 
-  return { cards, notifications: [] as Notification[], command };
+  const notifications: Notification[] = [];
+  return { cards, notifications, command };
 }
 
 function context(notifications: Notification[], overrides: CtxOverrides = {}): CommandContext {
