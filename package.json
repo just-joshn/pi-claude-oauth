@@ -10,6 +10,14 @@
     "pi-package"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/just-joshn/pi-claude-oauth.git"
+  },
+  "files": [
+    "extensions/claude-oauth/",
+    "CHANGELOG.md"
+  ],
   "type": "module",
   "scripts": {
     "test": "bun test",

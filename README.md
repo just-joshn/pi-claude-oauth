@@ -19,11 +19,13 @@ The extension registers a native Pi provider, `claude`, that:
 ## Install
 
 ```bash
-# From a git checkout
-pi install git:github.com/<you>/pi-claude-oauth
+pi install npm:pi-claude-oauth
+```
 
-# Or try a local checkout for one run
-pi -e ./pi-claude-oauth
+To try it for one run without saving it to your Pi settings:
+
+```bash
+pi -e npm:pi-claude-oauth
 ```
 
 ## Sign in
