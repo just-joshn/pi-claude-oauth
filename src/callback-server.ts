@@ -16,7 +16,6 @@ const NOT_THE_REDIRECT = "This local address only accepts the Claude sign-in red
 
 const redirectUriFor = (port: number): string => `http://localhost:${port}${CALLBACK_PATH}`;
 
-/** The redirect to register when no callback server is running and the user pastes the result instead. */
 export const DEFAULT_REDIRECT_URI = redirectUriFor(PREFERRED_PORT);
 
 interface LoopbackServerOptions {
@@ -28,7 +27,7 @@ interface LoopbackServerOptions {
 
 export interface LoopbackServer {
   readonly redirectUri: string;
-  /** Resolves the authorization code. Stays pending once the server is closed. */
+  /** Stays pending if the server closes before a code arrives. */
   waitForCode(): Promise<string>;
   close(): void;
 }
@@ -151,7 +150,7 @@ export async function startLoopbackServer(options: LoopbackServerOptions): Promi
     throw new ClaudeAuthError("Claude sign-in was cancelled.");
   }
   const { promise, resolve, reject } = Promise.withResolvers<string>();
-  // A sign-in that finishes by pasting never awaits this promise.
+  // A login cancelled before it waits for the code would otherwise leave an unhandled rejection.
   promise.catch(() => {});
 
   const close = () => {

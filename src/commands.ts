@@ -133,8 +133,7 @@ function showStatus(pi: CommandHost, ctx: CommandContext): void {
 async function showUsage(pi: CommandHost, ctx: CommandContext): Promise<void> {
   ctx.ui.setStatus("claude-usage", "Fetching Claude usage...");
   try {
-    // `getApiKeyForProvider` swallows auth errors, which would turn a failed
-    // refresh into a misleading "not signed in".
+    // `getApiKeyForProvider` swallows refresh errors and would report "not signed in".
     const accessToken = (await ctx.modelRegistry.getProviderAuth(CLAUDE_PROVIDER_ID))?.auth.apiKey;
     if (!accessToken) {
       ctx.ui.notify(`No Claude sign-in found. Run /login ${CLAUDE_PROVIDER_ID} first.`, "warning");

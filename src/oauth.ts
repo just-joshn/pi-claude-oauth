@@ -1,18 +1,8 @@
-/**
- * Claude subscription OAuth protocol.
- *
- * Constants mirror the current Claude Code client (2.1.331) and the flows that
- * Anthropic documents:
- * - https://code.claude.com/docs/en/authentication
- * - https://code.claude.com/docs/en/cli-reference (`claude setup-token`)
- * - https://code.claude.com/docs/en/env-vars (`CLAUDE_CODE_OAUTH_TOKEN`)
- */
-
 export const CLAUDE_AUTHORIZE_URL = "https://claude.com/cai/oauth/authorize";
 export const CLAUDE_TOKEN_URL = "https://platform.claude.com/v1/oauth/token";
 export const CLAUDE_COPY_CODE_REDIRECT_URI = "https://platform.claude.com/oauth/code/callback";
 
-/** Public PKCE client id that Claude Code itself uses. It is not a secret. */
+/** Claude Code's public PKCE client id; not a secret. */
 export const CLAUDE_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 
 /** Minimum Claude Code scope set that covers inference and account lookup. */
@@ -105,11 +95,6 @@ export function buildAuthorizeUrl(options: AuthorizeUrlOptions): string {
   return `${CLAUDE_AUTHORIZE_URL}?${params.toString()}`;
 }
 
-/**
- * Accepts what a browser redirect, the Claude Code success page, or a terminal
- * user can hand over: a full redirect URL, `code#state`, a query string, or a
- * bare authorization code.
- */
 export function parseAuthorizationInput(input: string): {
   code?: string | undefined;
   state?: string | undefined;
