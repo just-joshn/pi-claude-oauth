@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3] - 2026-11-24
+
+### Fixed
+
+- Releases are staged on npm through trusted publishing and published after maintainer approval. Direct publishing
+  was rejected, so 0.1.1 and 0.1.2 never reached npm; 0.1.3 contains their changes.
+
 ## [0.1.2] - 2026-11-24
 
 ### Internal

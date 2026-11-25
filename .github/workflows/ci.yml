@@ -77,7 +77,7 @@ jobs:
           overwrite: true
 
   publish:
-    name: Publish to npm
+    name: Stage on npm
     needs: verify
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'just-joshn/pi-claude-oauth' && needs.verify.outputs.release-version != ''
     runs-on: ubuntu-latest
@@ -113,7 +113,8 @@ jobs:
             fi
             echo "$name@$VERSION is already published with matching integrity"
           else
-            npm publish "$tarball" --ignore-scripts --provenance --access public
+            npm stage publish "$tarball" --ignore-scripts --provenance --access public
+            echo "::notice::Approve $name@$VERSION with 2FA on npmjs.com or with npm stage approve to publish it"
           fi
 
   github-release:
