@@ -1,7 +1,14 @@
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import { rejects } from "node:assert/strict";
+import { createHash } from "node:crypto";
+
 import type { AuthEvent, AuthPrompt, ProviderAuthInteraction } from "@earendil-works/pi-ai";
-import { describe, expect, it } from "vitest";
-import { LOGIN_METHODS, login, type LoginDependencies } from "../extensions/claude-oauth/login";
-import { CLAUDE_AUTHORIZE_URL, CLAUDE_COPY_CODE_REDIRECT_URI } from "../extensions/claude-oauth/oauth";
+
+import { login, type LoginDependencies } from "../extensions/claude-oauth/login";
+import {
+  CLAUDE_AUTHORIZE_URL,
+  CLAUDE_COPY_CODE_REDIRECT_URI,
+} from "../extensions/claude-oauth/oauth";
 
 function interaction(method: string, answers: string[] = []) {
   const events: AuthEvent[] = [];
@@ -19,10 +26,14 @@ function interaction(method: string, answers: string[] = []) {
       const answer = answers[next++];
       if (answer !== undefined) return answer;
 
-      const signal = prompt.signal ? AbortSignal.any([controller.signal, prompt.signal]) : controller.signal;
+      const signal = prompt.signal
+        ? AbortSignal.any([controller.signal, prompt.signal])
+        : controller.signal;
       return new Promise<string>((_resolve, reject) => {
         if (signal.aborted) reject(new Error("Login cancelled"));
-        signal.addEventListener("abort", () => reject(new Error("Login cancelled")), { once: true });
+        signal.addEventListener("abort", () => reject(new Error("Login cancelled")), {
+          once: true,
+        });
       });
     },
   };
@@ -32,15 +43,19 @@ function interaction(method: string, answers: string[] = []) {
 
 const tokenResponse = (): Response =>
   new Response(
-    JSON.stringify({ access_token: "sk-ant-oat01-access", refresh_token: "refresh", expires_in: 3600 }),
+    JSON.stringify({
+      access_token: "sk-ant-oat01-access",
+      refresh_token: "refresh",
+      expires_in: 3600,
+    }),
     { status: 200 },
   );
 
 const recordExchange = () => {
-  const calls: Array<Record<string, string>> = [];
+  const calls: unknown[] = [];
   const dependencies: LoginDependencies = {
-    fetch: async (_input, init) => {
-      calls.push(JSON.parse(String(init?.body)));
+    fetch: async (url, init) => {
+      calls.push(await new Request(url, init).json());
       return tokenResponse();
     },
   };
@@ -53,28 +68,74 @@ const authUrl = (events: AuthEvent[]): URL => {
   return new URL(event.url);
 };
 
+function expectPkceExchange(call: unknown, url: URL): void {
+  if (
+    !call ||
+    typeof call !== "object" ||
+    !("code_verifier" in call) ||
+    typeof call.code_verifier !== "string"
+  ) {
+    throw new Error("Expected a PKCE verifier in the exchange");
+  }
+  const state = url.searchParams.get("state");
+  expect(state).toBeTruthy();
+  expect(call).toMatchObject({ state });
+  expect(url.href).not.toContain(call.code_verifier);
+  expect(url.searchParams.get("code_challenge")).toBe(
+    createHash("sha256").update(call.code_verifier).digest("base64url"),
+  );
+}
+
 describe("login", () => {
-  it("offers browser, headless, and long-lived token methods", async () => {
-    const { interaction: fake, prompts } = interaction("setup_token", ["sk-ant-oat01-token"]);
-    await login(fake);
+  describe("setup-token import", () => {
+    const name = "CLAUDE_CODE_OAUTH_TOKEN";
+    let previous: string | undefined;
+    beforeEach(() => {
+      previous = process.env[name];
+      process.env[name] = "sk-ant-oat01-env-fixture";
+    });
+    afterEach(() => {
+      if (previous === undefined) delete process.env[name];
+      else process.env[name] = previous;
+    });
 
-    const select = prompts[0];
-    expect(select?.type).toBe("select");
-    if (select?.type !== "select") throw new Error("expected select");
-    expect(select.options.map((option) => option.id)).toEqual([...LOGIN_METHODS]);
-    expect(select.options[0]?.id).toBe("browser");
-  });
+    it("offers browser, headless, and long-lived token methods", async () => {
+      const { interaction: fake, prompts } = interaction("setup_token", ["sk-ant-oat01-token"]);
+      await login(fake);
 
-  it("stores a pasted setup token without exchanging it", async () => {
-    const { interaction: fake } = interaction("setup_token", [" sk-ant-oat01-token "]);
-    const credential = await login(fake);
+      const select = prompts[0];
+      expect(select?.type).toBe("select");
+      if (select?.type !== "select") throw new Error("expected select");
+      expect(select.message).toContain("extra usage");
+      expect(select.options.map((option) => option.id)).toEqual([
+        "browser",
+        "copy_code",
+        "setup_token",
+      ]);
+    });
 
-    expect(credential).toMatchObject({ type: "oauth", access: "sk-ant-oat01-token", refresh: "" });
-  });
+    it("imports the environment token without asking for it or displaying it", async () => {
+      const { interaction: fake, prompts, events } = interaction("setup_token", ["wrong-input"]);
+      const credential = await login(fake);
+      expect(credential).toMatchObject({
+        type: "oauth",
+        access: "sk-ant-oat01-env-fixture",
+        refresh: "",
+      });
+      expect(prompts.map((p) => p.type)).toEqual(["select"]);
+      expect(JSON.stringify([prompts, events])).not.toContain("sk-ant-oat01-env-fixture");
+    });
 
-  it("rejects a pasted value that is not a Claude token", async () => {
-    const { interaction: fake } = interaction("setup_token", ["nope"]);
-    await expect(login(fake)).rejects.toThrow(/claude setup-token/);
+    it.each([undefined, "invalid"])(
+      "explains how to supply a valid environment token (%s)",
+      async (value) => {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+        const { interaction: fake, prompts } = interaction("setup_token", ["sk-ant-oat01-decoy"]);
+        await rejects(login(fake), /CLAUDE_CODE_OAUTH_TOKEN/);
+        expect(prompts).toHaveLength(1);
+      },
+    );
   });
 
   it("exchanges a pasted copy-code result", async () => {
@@ -90,18 +151,30 @@ describe("login", () => {
       code: "the-code",
       redirect_uri: CLAUDE_COPY_CODE_REDIRECT_URI,
     });
+    expectPkceExchange(calls[0], authUrl(events));
     expect(authUrl(events).searchParams.get("redirect_uri")).toBe(CLAUDE_COPY_CODE_REDIRECT_URI);
     expect(authUrl(events).searchParams.get("code_challenge_method")).toBe("S256");
   });
 
-  it("rejects a copy-code result from another sign-in request", async () => {
-    const { interaction: fake } = interaction("copy_code", ["the-code#other-state"]);
-    await expect(login(fake)).rejects.toThrow(/different request/);
+  it("rejects an initial exchange that cannot produce a refreshable credential", async () => {
+    const { interaction: fake } = interaction("copy_code", ["the-code"]);
+
+    await rejects(
+      login(fake, {
+        fetch: async () => Response.json({ access_token: "fixture", expires_in: 3600 }),
+      }),
+      /did not include a refresh token/,
+    );
   });
 
-  it("rejects an empty copy-code result", async () => {
+  it("rejects a copy-code result from another sign-in request", () => {
+    const { interaction: fake } = interaction("copy_code", ["the-code#other-state"]);
+    expect(login(fake)).rejects.toThrow(/different request/);
+  });
+
+  it("rejects an empty copy-code result", () => {
     const { interaction: fake } = interaction("copy_code", ["   "]);
-    await expect(login(fake)).rejects.toThrow(/No authorization code/);
+    expect(login(fake)).rejects.toThrow(/No authorization code/);
   });
 
   it("exchanges the code from the local browser callback", async () => {
@@ -111,19 +184,42 @@ describe("login", () => {
 
     const credential = await login(fake, {
       ...dependencies,
-      startServer: async () => ({ redirectUri, waitForCode: async () => "callback-code", close: () => {} }),
+      startServer: async () => ({
+        redirectUri,
+        waitForCode: async () => "callback-code",
+        close: () => {},
+      }),
     });
 
     expect(credential.access).toBe("sk-ant-oat01-access");
+    const url = authUrl(events);
+    expectPkceExchange(calls[0], url);
     expect(calls[0]).toMatchObject({ code: "callback-code", redirect_uri: redirectUri });
-    expect(authUrl(events).origin + authUrl(events).pathname).toBe(CLAUDE_AUTHORIZE_URL);
-    expect(authUrl(events).searchParams.get("redirect_uri")).toBe(redirectUri);
-    expect(authUrl(events).searchParams.get("code")).toBe("true");
-    expect(authUrl(events).searchParams.get("state")).toBeTruthy();
+    expect(url.origin + url.pathname).toBe(CLAUDE_AUTHORIZE_URL);
+    expect(url.searchParams.get("redirect_uri")).toBe(redirectUri);
+    expect(url.searchParams.get("code")).toBe("true");
+  });
+
+  it("releases the listener before exchanging a manually entered browser code", async () => {
+    const { interaction: fake } = interaction("browser", ["pasted-code"]);
+    const close = mock(() => {});
+    await login(fake, {
+      startServer: async () => ({
+        redirectUri: "http://localhost:1234/callback",
+        waitForCode: () => new Promise<string>(() => {}),
+        close,
+      }),
+      fetch: async () => {
+        expect(close).toHaveBeenCalled();
+        return tokenResponse();
+      },
+    });
   });
 
   it("accepts a pasted redirect URL when no callback server can start", async () => {
-    const { interaction: fake } = interaction("browser", ["http://localhost:53692/callback?code=pasted-code"]);
+    const { interaction: fake } = interaction("browser", [
+      "http://localhost:53692/callback?code=pasted-code",
+    ]);
     const { calls, dependencies } = recordExchange();
 
     await login(fake, {
@@ -133,11 +229,14 @@ describe("login", () => {
       },
     });
 
-    expect(calls[0]).toMatchObject({ code: "pasted-code", redirect_uri: "http://localhost:53692/callback" });
+    expect(calls[0]).toMatchObject({
+      code: "pasted-code",
+      redirect_uri: "http://localhost:53692/callback",
+    });
   });
 
   it("cancels the login when the user aborts", async () => {
-    const { interaction: fake, controller } = interaction("browser");
+    const { interaction: fake, controller, events } = interaction("browser");
     const pending = login(fake, {
       startServer: async () => {
         throw new Error("no server");
@@ -145,11 +244,12 @@ describe("login", () => {
     });
 
     controller.abort();
-    await expect(pending).rejects.toThrow(/Login cancelled/);
+    await rejects(pending, /cancelled/i);
+    expect(events.some((event) => event.type === "auth_url")).toBe(false);
   });
 
-  it("rejects an unknown method", async () => {
+  it("rejects an unknown method", () => {
     const { interaction: fake } = interaction("bogus");
-    await expect(login(fake)).rejects.toThrow(/Unknown Claude login method/);
+    expect(login(fake)).rejects.toThrow(/Unknown Claude login method/);
   });
 });

@@ -2,36 +2,44 @@
   "name": "pi-claude-oauth",
   "version": "0.1.0",
   "description": "Use Claude Pro, Max, and Ultra subscription OAuth tokens from Pi",
-  "type": "module",
-  "license": "MIT",
   "keywords": [
-    "pi-package",
-    "pi-extension",
     "claude",
     "claude-code",
-    "oauth"
+    "oauth",
+    "pi-extension",
+    "pi-package"
   ],
-  "pi": {
-    "extensions": [
-      "./extensions/claude-oauth/index.ts"
-    ]
-  },
+  "license": "MIT",
+  "type": "module",
   "scripts": {
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "coverage": "vitest run --coverage",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "coverage": "bun scripts/coverage.ts",
+    "format": "bun fmt",
+    "format:check": "bun fmt --check",
+    "lint": "oxlint --type-aware",
+    "lint:fix": "oxlint --type-aware --fix",
     "typecheck": "tsc --noEmit"
-  },
-  "peerDependencies": {
-    "@earendil-works/pi-ai": "*",
-    "@earendil-works/pi-coding-agent": "*"
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "1.6.0",
     "@earendil-works/pi-coding-agent": "1.6.0",
+    "@earendil-works/pi-tui": "1.6.0",
+    "@types/bun": "^1.4.5",
     "@types/node": "^24.10.1",
-    "@vitest/coverage-v8": "^4.0.10",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.10"
+    "oxlint": "^1.95.0",
+    "oxlint-tsgolint": "^7.0.2008",
+    "typescript": "^7.0.2"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "packageManager": "bun@1.4.5",
+  "pi": {
+    "extensions": [
+      "./extensions/claude-oauth/index.ts"
+    ]
   }
 }

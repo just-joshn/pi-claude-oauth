@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2023",
-    "lib": ["ES2023", "DOM"],
+    "lib": ["ES2024", "DOM"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
@@ -10,7 +10,7 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["node"]
+    "types": ["node", "bun"]
   },
-  "include": ["extensions/**/*.ts", "test/**/*.ts", "vitest.config.ts"]
+  "include": ["extensions/**/*.ts", "scripts/**/*.ts", "test/**/*.ts"]
 }

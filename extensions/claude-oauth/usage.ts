@@ -1,4 +1,10 @@
-import { CLAUDE_OAUTH_BETA, ClaudeAuthError, isRecord, type FetchLike } from "./oauth";
+import {
+  CLAUDE_OAUTH_BETA,
+  ClaudeAuthError,
+  fetchJsonWithDeadline,
+  type FetchLike,
+  isRecord,
+} from "./oauth";
 
 export const CLAUDE_USAGE_URL = "https://api.anthropic.com/api/oauth/usage";
 
@@ -11,7 +17,7 @@ const BUCKETS = [
   ["seven_day_sonnet", "7-day Sonnet"],
 ] as const;
 
-export interface UsageBucket {
+interface UsageBucket {
   readonly label: string;
   readonly utilization: number;
   readonly resetsAt?: string;
@@ -21,8 +27,7 @@ export interface UsageReport {
   readonly buckets: readonly UsageBucket[];
 }
 
-export interface FetchUsageOptions {
-  readonly signal: AbortSignal;
+interface FetchUsageOptions {
   readonly fetch?: FetchLike;
   readonly timeoutMs?: number;
 }
@@ -66,39 +71,33 @@ export function formatUsage(
   });
 }
 
-export async function fetchUsage(accessToken: string, options: FetchUsageOptions): Promise<UsageReport> {
-  const timeout = AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-  let response: Response;
-  try {
-    response = await (options.fetch ?? fetch)(CLAUDE_USAGE_URL, {
+export async function fetchUsage(
+  accessToken: string,
+  options: FetchUsageOptions = {},
+): Promise<UsageReport> {
+  const { ok, status, payload } = await fetchJsonWithDeadline(
+    CLAUDE_USAGE_URL,
+    {
       headers: {
         authorization: `Bearer ${accessToken}`,
         accept: "application/json",
         "anthropic-beta": CLAUDE_OAUTH_BETA,
         "x-app": "cli",
       },
-      signal: AbortSignal.any([options.signal, timeout]),
-    });
-  } catch (error) {
-    if (options.signal.aborted) throw new ClaudeAuthError("Claude usage lookup was cancelled.", { cause: error });
-    if (timeout.aborted) throw new ClaudeAuthError("Claude did not answer the usage request in time.", { cause: error });
-    throw new ClaudeAuthError(`Could not reach ${CLAUDE_USAGE_URL}.`, { cause: error });
-  }
+    },
+    { fetch: options.fetch, timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS },
+  );
 
-  if (response.status === 401 || response.status === 403) {
+  if (status === 401 || status === 403) {
     throw new ClaudeAuthError(
-      `Claude rejected the saved token for usage lookup (HTTP ${response.status}). Run \`/login claude\` again.`,
+      `Claude rejected the saved token for usage lookup (HTTP ${status}). Run \`/login claude\` again.`,
     );
   }
-  if (!response.ok) {
-    throw new ClaudeAuthError(`Claude usage lookup failed (HTTP ${response.status}).`);
+  if (!ok) {
+    throw new ClaudeAuthError(`Claude usage lookup failed (HTTP ${status}).`);
   }
 
-  let payload: unknown;
-  try {
-    payload = await response.json();
-  } catch {
+  if (payload === undefined)
     throw new ClaudeAuthError("Claude returned usage data that was not valid JSON.");
-  }
   return parseUsage(payload);
 }

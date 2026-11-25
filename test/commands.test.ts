@@ -1,83 +1,84 @@
-import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, mock, spyOn } from "bun:test";
+
+import { getBuiltinModels } from "@earendil-works/pi-ai/providers/all";
+
 import {
+  type CardData,
   CLAUDE_CARD_TYPE,
+  type CommandContext,
+  type CommandHost,
   registerClaudeCommand,
   statusCard,
   usageCard,
-  type CardData,
 } from "../extensions/claude-oauth/commands";
+import { claudeModels } from "../extensions/claude-oauth/models";
 import { parseUsage } from "../extensions/claude-oauth/usage";
 
-interface Harness {
-  readonly pi: ExtensionAPI;
-  readonly cards: CardData[];
-  readonly notifications: Array<{ message: string; level: string }>;
-  readonly command: {
-    handler: (args: string, ctx: ExtensionCommandContext) => Promise<void>;
-    getArgumentCompletions?: (prefix: string) => unknown;
-  };
-}
+type Notification = { message: string; level: string };
+type Command = Parameters<CommandHost["registerCommand"]>[1];
 
 interface CtxOverrides {
-  readonly configured?: boolean;
-  readonly source?: string;
   readonly accessToken?: string | undefined;
-  readonly model?: { provider: string; id: string };
-  readonly models?: Array<{ provider: string }>;
+  readonly authError?: Error;
+  readonly model?: CommandContext["model"];
 }
 
-function harness(): Harness {
-  const cards: CardData[] = [];
-  const notifications: Array<{ message: string; level: string }> = [];
-  let command: Harness["command"] | undefined;
+const CATALOG = [...claudeModels().slice(0, 2), ...getBuiltinModels("anthropic").slice(0, 1)];
 
-  const pi = {
-    appendEntry: (type: string, data: CardData) => {
+function harness() {
+  const cards: CardData[] = [];
+  const commands: Command[] = [];
+
+  const host: CommandHost = {
+    appendEntry: (type, data) => {
       expect(type).toBe(CLAUDE_CARD_TYPE);
       cards.push(data);
     },
-    registerCommand: (_name: string, options: Harness["command"]) => {
-      command = options;
+    registerCommand: (_name, options) => {
+      commands.push(options);
     },
-  } as unknown as ExtensionAPI;
+  };
 
-  registerClaudeCommand(pi);
+  registerClaudeCommand(host);
+  const [command] = commands;
   if (!command) throw new Error("command was not registered");
 
-  return { pi, cards, notifications, command };
+  return { cards, notifications: [] as Notification[], command };
 }
 
-function context(notifications: Array<{ message: string; level: string }>, overrides: CtxOverrides = {}): ExtensionCommandContext {
+function context(notifications: Notification[], overrides: CtxOverrides = {}): CommandContext {
   return {
     modelRegistry: {
-      getProviderAuthStatus: () => ({
-        configured: overrides.configured ?? true,
-        source: overrides.source ?? "stored",
-      }),
-      getAll: () => overrides.models ?? [{ provider: "claude" }, { provider: "claude" }, { provider: "anthropic" }],
-      getApiKeyForProvider: async () => ("accessToken" in overrides ? overrides.accessToken : "sk-ant-oat01-token"),
+      getProviderAuthStatus: () => ({ configured: true, source: "stored" }),
+      getAll: () => CATALOG,
+      getProviderAuth: async () => {
+        if (overrides.authError) throw overrides.authError;
+        const apiKey = "accessToken" in overrides ? overrides.accessToken : "sk-ant-oat01-token";
+        return apiKey ? { auth: { apiKey } } : undefined;
+      },
     },
     model: overrides.model,
     ui: {
-      notify: (message: string, level = "info") => {
+      notify: (message, level = "info") => {
         notifications.push({ message, level });
-        return { status: "shown" as const };
       },
       setStatus: () => {},
     },
-  } as unknown as ExtensionCommandContext;
+  };
 }
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-  delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
-});
+afterEach(() => mock.restore());
 
 describe("statusCard", () => {
   it("shows the saved sign-in and the active model", () => {
     const card = statusCard(
-      { configured: true, source: "stored", envToken: false, modelCount: 18, activeModel: "claude-opus-5-5" },
+      {
+        configured: true,
+        source: "stored",
+        envToken: false,
+        modelCount: 18,
+        activeModel: "claude-opus-5-5",
+      },
       1,
     );
 
@@ -102,7 +103,12 @@ describe("statusCard", () => {
   });
 
   it("shows an unknown source verbatim", () => {
-    const card = statusCard({ configured: true, source: "models_json_key", envToken: false, modelCount: 1 });
+    const card = statusCard({
+      configured: true,
+      source: "models_json_key",
+      envToken: false,
+      modelCount: 1,
+    });
     expect(card.lines[0]?.text).toBe("Signed in via models_json_key");
   });
 });
@@ -122,20 +128,22 @@ describe("/claude command", () => {
     await command.handler("", context(notifications));
 
     expect(cards).toHaveLength(1);
-    expect(cards[0]?.lines.map((line) => line.text)).toContain("2 Claude (Pro/Max/Ultra) models in the catalog");
+    expect(cards[0]?.lines.map((line) => line.text)).toContain(
+      "2 Claude (Pro/Max/Ultra) models in the catalog",
+    );
   });
 
   it("shows the active Claude model only when Claude is selected", async () => {
     const { cards, notifications, command } = harness();
-    await command.handler("status", context(notifications, { model: { provider: "openai", id: "gpt" } }));
+    await command.handler(
+      "status",
+      context(notifications, { model: getBuiltinModels("anthropic")[0] }),
+    );
     expect(cards[0]?.lines.some((line) => line.text.startsWith("Active model"))).toBe(false);
   });
 
   it("shows usage from the stored token", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => new Response(JSON.stringify({ five_hour: { utilization: 30 } }), { status: 200 })),
-    );
+    spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ five_hour: { utilization: 30 } }));
     const { cards, notifications, command } = harness();
     await command.handler("usage", context(notifications));
 
@@ -148,11 +156,28 @@ describe("/claude command", () => {
     await command.handler("usage", context(notifications, { accessToken: undefined }));
 
     expect(cards).toHaveLength(0);
-    expect(notifications.at(-1)).toEqual({ message: "No Claude sign-in found. Run /login claude first.", level: "warning" });
+    expect(notifications.at(-1)).toEqual({
+      message: "No Claude sign-in found. Run /login claude first.",
+      level: "warning",
+    });
+  });
+
+  it("reports why the saved sign-in could not be used", async () => {
+    const authError = new Error("OAuth refresh failed for claude", {
+      cause: new Error("This Claude token cannot be refreshed."),
+    });
+    const { cards, notifications, command } = harness();
+    await command.handler("usage", context(notifications, { authError }));
+
+    expect(cards).toHaveLength(0);
+    expect(notifications.at(-1)).toEqual({
+      message: "OAuth refresh failed for claude: This Claude token cannot be refreshed.",
+      level: "error",
+    });
   });
 
   it("reports usage failures", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 401 })));
+    spyOn(globalThis, "fetch").mockResolvedValue(Response.json({}, { status: 401 }));
     const { cards, notifications, command } = harness();
     await command.handler("usage", context(notifications));
 
@@ -180,8 +205,10 @@ describe("/claude command", () => {
 
   it("completes subcommands by prefix", () => {
     const { command } = harness();
-    const matches = command.getArgumentCompletions?.("lo") as Array<{ value: string }> | null;
-    expect(matches?.map((match) => match.value)).toEqual(["login", "logout"]);
+    expect(command.getArgumentCompletions?.("lo")).toMatchObject([
+      { value: "login" },
+      { value: "logout" },
+    ]);
     expect(command.getArgumentCompletions?.("zzz")).toBeNull();
   });
 });

@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { renderClaudeCard, type CardTheme } from "../extensions/claude-oauth/ui";
+import { describe, expect, it } from "bun:test";
+
 import { statusCard } from "../extensions/claude-oauth/commands";
+import { type CardTheme, renderClaudeCard } from "../extensions/claude-oauth/ui";
 
 const theme: CardTheme = {
   bold: (text) => `<b>${text}</b>`,
@@ -8,12 +9,20 @@ const theme: CardTheme = {
   bg: (_color, text) => text,
 };
 
-const render = (data: Parameters<typeof renderClaudeCard>[0]): string => renderClaudeCard(data, theme).render(120).join("\n");
+const options = { expanded: false, keyText: () => "", keyHint: () => "" };
+const render = (data: unknown): string =>
+  renderClaudeCard({ data }, options, theme).render(120).join("\n");
 
 describe("renderClaudeCard", () => {
   it("renders the title and toned lines", () => {
     const output = render(
-      statusCard({ configured: true, source: "stored", envToken: false, modelCount: 18, activeModel: "claude-opus-5-5" }),
+      statusCard({
+        configured: true,
+        source: "stored",
+        envToken: false,
+        modelCount: 18,
+        activeModel: "claude-opus-5-5",
+      }),
     );
 
     expect(output).toContain("<b>Claude (Pro/Max/Ultra)</b>");
@@ -28,5 +37,14 @@ describe("renderClaudeCard", () => {
 
   it("degrades gracefully without data", () => {
     expect(render(undefined)).toContain("<dim>Claude status unavailable</>");
+  });
+
+  it.each([
+    '{"title":"Older card"}',
+    '{"title":"Older card","lines":[{"text":"ok"},null]}',
+    '{"title":"Older card","lines":[{"text":"ok","tone":"retired"}]}',
+    '{"title":4,"lines":[]}',
+  ])("falls back for incompatible saved data: %s", (saved) => {
+    expect(render(JSON.parse(saved))).toContain("<dim>Claude status unavailable</>");
   });
 });

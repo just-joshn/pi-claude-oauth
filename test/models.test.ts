@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { claudeModels, CLAUDE_PROVIDER_ID } from "../extensions/claude-oauth/models";
+import { describe, expect, it } from "bun:test";
+
+import { CLAUDE_PROVIDER_ID, claudeModels } from "../extensions/claude-oauth/models";
 
 describe("claudeModels", () => {
   it("copies the Anthropic catalog so limits and thinking support stay current", () => {
@@ -12,6 +13,14 @@ describe("claudeModels", () => {
     expect(claudeModels().every((model) => model.provider === CLAUDE_PROVIDER_ID)).toBe(true);
   });
 
+  it("re-keys fallback models so Pi prices a fallback response under this provider", () => {
+    const fallbacks = claudeModels().flatMap((model) => model.compat?.allowedFallbackModels ?? []);
+    expect(fallbacks.length).toBeGreaterThan(0);
+    expect(new Set(fallbacks.map((fallback) => fallback.provider))).toEqual(
+      new Set([CLAUDE_PROVIDER_ID]),
+    );
+  });
+
   it("keeps the fields Pi needs to stream and price a request", () => {
     for (const model of claudeModels()) {
       expect(model.id.length).toBeGreaterThan(0);
@@ -22,9 +31,5 @@ describe("claudeModels", () => {
       expect(model.input.length).toBeGreaterThan(0);
       expect(model.cost.input).toBeGreaterThanOrEqual(0);
     }
-  });
-
-  it("supports an alternate provider id for tests and forks", () => {
-    expect(claudeModels("claude-copy").every((model) => model.provider === "claude-copy")).toBe(true);
   });
 });

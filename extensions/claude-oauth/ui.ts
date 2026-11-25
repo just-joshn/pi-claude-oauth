@@ -1,5 +1,7 @@
+import type { CustomEntry, EntryRenderOptions } from "@earendil-works/pi-coding-agent";
 import { Box, Text } from "@earendil-works/pi-tui";
-import type { CardData, CardTone } from "./commands";
+
+import { type CardTone, isRenderableCard } from "./commands";
 
 export interface CardTheme {
   bold(text: string): string;
@@ -7,10 +9,14 @@ export interface CardTheme {
   bg(color: "customMessageBg", text: string): string;
 }
 
-export function renderClaudeCard(data: CardData | undefined, theme: CardTheme): Box {
+export function renderClaudeCard(
+  { data }: Pick<CustomEntry, "data">,
+  _options: EntryRenderOptions,
+  theme: CardTheme,
+): Box {
   const box = new Box(1, 1, (text) => theme.bg("customMessageBg", text));
 
-  if (!data) {
+  if (!isRenderableCard(data)) {
     box.addChild(new Text(theme.fg("dim", "Claude status unavailable"), 0, 0));
     return box;
   }

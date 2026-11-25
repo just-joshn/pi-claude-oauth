@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, mock } from "bun:test";
+import { rejects } from "node:assert/strict";
+
 import {
   CLAUDE_USAGE_URL,
   fetchUsage,
@@ -6,8 +8,6 @@ import {
   formatUsage,
   parseUsage,
 } from "../extensions/claude-oauth/usage";
-
-const signal = () => new AbortController().signal;
 
 const response = (body: unknown, status = 200): Response =>
   new Response(typeof body === "string" ? body : JSON.stringify(body), { status });
@@ -80,9 +80,8 @@ describe("fetchUsage", () => {
   it("calls the OAuth usage endpoint with the documented headers", async () => {
     let captured: { url: string; headers: unknown } | undefined;
     const report = await fetchUsage("sk-ant-oat01-token", {
-      signal: signal(),
-      fetch: async (input, init) => {
-        captured = { url: String(input), headers: init?.headers };
+      fetch: async (url, init) => {
+        captured = { url, headers: init.headers };
         return response(usagePayload);
       },
     });
@@ -96,28 +95,40 @@ describe("fetchUsage", () => {
     expect(report.buckets).toHaveLength(4);
   });
 
-  it("asks for a new sign-in when the token is rejected", async () => {
-    await expect(
-      fetchUsage("token", { signal: signal(), fetch: async () => response({}, 401) }),
-    ).rejects.toThrow(/\/login claude/);
+  it("asks for a new sign-in when the token is rejected", () => {
+    expect(fetchUsage("token", { fetch: async () => response({}, 401) })).rejects.toThrow(
+      /\/login claude/,
+    );
   });
 
-  it("reports other HTTP failures", async () => {
-    await expect(
-      fetchUsage("token", { signal: signal(), fetch: async () => response({}, 503) }),
-    ).rejects.toThrow(/HTTP 503/);
+  it("reports other HTTP failures", () => {
+    expect(fetchUsage("token", { fetch: async () => response({}, 503) })).rejects.toThrow(
+      /HTTP 503/,
+    );
   });
 
-  it("reports invalid JSON", async () => {
-    await expect(fetchUsage("token", { signal: signal(), fetch: async () => response("<html>") })).rejects.toThrow(
+  it("cancels an unused error body without masking the HTTP failure", async () => {
+    const cancellation = mock(async () => {
+      throw new Error("cleanup failure");
+    });
+    const body = new ReadableStream({ cancel: cancellation });
+
+    await rejects(
+      fetchUsage("fixture", { fetch: async () => new Response(body, { status: 503 }) }),
+      /HTTP 503/,
+    );
+    expect(cancellation).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports invalid JSON", () => {
+    expect(fetchUsage("token", { fetch: async () => response("<html>") })).rejects.toThrow(
       /not valid JSON/,
     );
   });
 
-  it("reports an unreachable endpoint", async () => {
-    await expect(
+  it("reports an unreachable endpoint", () => {
+    expect(
       fetchUsage("token", {
-        signal: signal(),
         fetch: async () => {
           throw new Error("offline");
         },
@@ -125,16 +136,15 @@ describe("fetchUsage", () => {
     ).rejects.toThrow(/Could not reach/);
   });
 
-  it("reports cancellation", async () => {
-    const controller = new AbortController();
-    controller.abort();
-    await expect(
+  it("reports a timeout", () => {
+    expect(
       fetchUsage("token", {
-        signal: controller.signal,
-        fetch: async () => {
-          throw new Error("aborted");
-        },
+        timeoutMs: 5,
+        fetch: (_input, init) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+          }),
       }),
-    ).rejects.toThrow(/cancelled/);
+    ).rejects.toThrow(/did not answer/);
   });
 });

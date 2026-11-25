@@ -1,20 +1,42 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { CLAUDE_CODE_OAUTH_TOKEN_ENV } from "./provider";
+
+import { CLAUDE_CODE_OAUTH_TOKEN_ENV } from "./credential";
 import { CLAUDE_PROVIDER_ID, CLAUDE_PROVIDER_NAME } from "./models";
+import { isRecord } from "./oauth";
 import { fetchUsage, formatUsage, type UsageReport } from "./usage";
 
 export const CLAUDE_CARD_TYPE = "claude-card";
 
-const SUBCOMMANDS = [
-  { value: "status", label: "status", description: "Show sign-in status and available models" },
-  { value: "usage", label: "usage", description: "Show subscription usage windows" },
-  { value: "login", label: "login", description: "How to sign in" },
-  { value: "logout", label: "logout", description: "How to remove the saved sign-in" },
-] as const;
+export interface CommandContext {
+  readonly model: ExtensionCommandContext["model"];
+  readonly modelRegistry: Pick<
+    ExtensionCommandContext["modelRegistry"],
+    "getProviderAuthStatus" | "getAll" | "getProviderAuth"
+  >;
+  readonly ui: Pick<ExtensionCommandContext["ui"], "notify" | "setStatus">;
+}
 
-export type CardTone = "accent" | "success" | "warning" | "error" | "dim" | "muted";
+type PiCommand = Parameters<ExtensionAPI["registerCommand"]>[1];
+interface CommandOptions extends Omit<PiCommand, "handler"> {
+  handler(args: string, ctx: CommandContext): Promise<void>;
+}
 
-export interface CardLine {
+export interface CommandHost {
+  registerCommand(name: string, options: CommandOptions): void;
+  appendEntry(customType: string, data: CardData): void;
+}
+
+const SUBCOMMANDS = {
+  status: "Show sign-in status and available models",
+  usage: "Show subscription usage windows",
+  login: "How to sign in",
+  logout: "How to remove the saved sign-in",
+};
+
+const CARD_TONES = ["accent", "success", "warning", "error", "dim", "muted"] as const;
+export type CardTone = (typeof CARD_TONES)[number];
+
+interface CardLine {
   readonly text: string;
   readonly tone?: CardTone;
 }
@@ -25,7 +47,21 @@ export interface CardData {
   readonly timestamp: number;
 }
 
-export interface StatusInput {
+export function isRenderableCard(value: unknown): value is Pick<CardData, "title" | "lines"> {
+  return (
+    isRecord(value) &&
+    typeof value.title === "string" &&
+    Array.isArray(value.lines) &&
+    value.lines.every(
+      (line: unknown) =>
+        isRecord(line) &&
+        typeof line.text === "string" &&
+        (line.tone === undefined || CARD_TONES.some((tone) => tone === line.tone)),
+    )
+  );
+}
+
+interface StatusInput {
   readonly configured: boolean;
   readonly source?: string;
   readonly envToken: boolean;
@@ -70,44 +106,56 @@ export function usageCard(report: UsageReport, now = Date.now()): CardData {
   };
 }
 
-async function showStatus(pi: ExtensionAPI, ctx: ExtensionCommandContext): Promise<void> {
+/** Pi wraps the provider's refresh error as `cause`; the cause carries the actionable text. */
+function describeError(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  return error.cause === undefined
+    ? error.message
+    : `${error.message}: ${describeError(error.cause)}`;
+}
+
+function showStatus(pi: CommandHost, ctx: CommandContext): void {
   const status = ctx.modelRegistry.getProviderAuthStatus(CLAUDE_PROVIDER_ID);
-  pi.appendEntry<CardData>(
+  pi.appendEntry(
     CLAUDE_CARD_TYPE,
     statusCard({
       configured: status.configured,
       source: status.source,
       envToken: Boolean(process.env[CLAUDE_CODE_OAUTH_TOKEN_ENV]),
-      modelCount: ctx.modelRegistry.getAll().filter((model) => model.provider === CLAUDE_PROVIDER_ID).length,
+      modelCount: ctx.modelRegistry
+        .getAll()
+        .filter((model) => model.provider === CLAUDE_PROVIDER_ID).length,
       activeModel: ctx.model?.provider === CLAUDE_PROVIDER_ID ? ctx.model.id : undefined,
     }),
   );
 }
 
-async function showUsage(pi: ExtensionAPI, ctx: ExtensionCommandContext): Promise<void> {
-  const accessToken = await ctx.modelRegistry.getApiKeyForProvider(CLAUDE_PROVIDER_ID);
-  if (!accessToken) {
-    ctx.ui.notify(`No Claude sign-in found. Run /login ${CLAUDE_PROVIDER_ID} first.`, "warning");
-    return;
-  }
-
+async function showUsage(pi: CommandHost, ctx: CommandContext): Promise<void> {
   ctx.ui.setStatus("claude-usage", "Fetching Claude usage...");
   try {
-    const report = await fetchUsage(accessToken, { signal: AbortSignal.timeout(15_000) });
-    pi.appendEntry<CardData>(CLAUDE_CARD_TYPE, usageCard(report));
+    // `getApiKeyForProvider` swallows auth errors, which would turn a failed
+    // refresh into a misleading "not signed in".
+    const accessToken = (await ctx.modelRegistry.getProviderAuth(CLAUDE_PROVIDER_ID))?.auth.apiKey;
+    if (!accessToken) {
+      ctx.ui.notify(`No Claude sign-in found. Run /login ${CLAUDE_PROVIDER_ID} first.`, "warning");
+      return;
+    }
+    pi.appendEntry(CLAUDE_CARD_TYPE, usageCard(await fetchUsage(accessToken)));
   } catch (error) {
-    ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
+    ctx.ui.notify(describeError(error), "error");
   } finally {
     ctx.ui.setStatus("claude-usage", undefined);
   }
 }
 
-export function registerClaudeCommand(pi: ExtensionAPI): void {
+export function registerClaudeCommand(pi: CommandHost): void {
   pi.registerCommand("claude", {
     description: "Claude subscription sign-in status and usage",
     getArgumentCompletions: (prefix) => {
-      const matches = SUBCOMMANDS.filter((command) => command.value.startsWith(prefix));
-      return matches.length > 0 ? matches.map((command) => ({ ...command })) : null;
+      const matches = Object.entries(SUBCOMMANDS)
+        .filter(([value]) => value.startsWith(prefix))
+        .map(([value, description]) => ({ value, label: value, description }));
+      return matches.length > 0 ? matches : null;
     },
     handler: async (args, ctx) => {
       const [first] = args.trim().split(/\s+/);
@@ -115,19 +163,25 @@ export function registerClaudeCommand(pi: ExtensionAPI): void {
 
       switch (subcommand) {
         case "status":
-          await showStatus(pi, ctx);
+          showStatus(pi, ctx);
           return;
         case "usage":
           await showUsage(pi, ctx);
           return;
         case "login":
-          ctx.ui.notify(`Run /login ${CLAUDE_PROVIDER_ID}, then choose a Claude sign-in method.`, "info");
+          ctx.ui.notify(
+            `Run /login ${CLAUDE_PROVIDER_ID}, then choose a Claude sign-in method.`,
+            "info",
+          );
           return;
         case "logout":
           ctx.ui.notify(`Run /logout, then choose ${CLAUDE_PROVIDER_NAME}.`, "info");
           return;
         default:
-          ctx.ui.notify(`Unknown /claude subcommand "${subcommand}". Use status, usage, login, or logout.`, "error");
+          ctx.ui.notify(
+            `Unknown /claude subcommand "${subcommand}". Use status, usage, login, or logout.`,
+            "error",
+          );
       }
     },
   });

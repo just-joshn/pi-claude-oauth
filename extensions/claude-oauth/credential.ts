@@ -1,33 +1,30 @@
 import type { OAuthCredential } from "@earendil-works/pi-ai";
-import { CLAUDE_TOKEN_PREFIX, ClaudeAuthError, type TokenPayload } from "./oauth";
 
-/**
- * Claude OAuth access tokens live an hour. Pi refreshes five minutes before
- * expiry, so expire slightly early to keep refresh inside that window.
- */
-export const EXPIRY_SKEW_MS = 5 * 60_000;
+import { CLAUDE_TOKEN_PREFIX, ClaudeAuthError, type RefreshableTokenPayload } from "./oauth";
+
+export const CLAUDE_CODE_OAUTH_TOKEN_ENV = "CLAUDE_CODE_OAUTH_TOKEN";
 
 /** `claude setup-token` issues a one-year token that cannot be refreshed. */
 export const SETUP_TOKEN_LIFETIME_MS = 365 * 24 * 60 * 60_000;
 
-export function toOAuthCredential(token: TokenPayload, previousRefresh = "", now = Date.now()): OAuthCredential {
+/** Stores the server's own deadline: Pi already refreshes five minutes before `expires`. */
+export function toOAuthCredential(
+  token: RefreshableTokenPayload,
+  now = Date.now(),
+): OAuthCredential {
   return {
     type: "oauth",
     access: token.access,
-    refresh: token.refresh ?? previousRefresh,
-    expires: now + token.expiresIn * 1_000 - EXPIRY_SKEW_MS,
+    refresh: token.refresh,
+    expires: now + token.expiresIn * 1_000,
   };
 }
 
-export function isClaudeToken(value: string): boolean {
-  return value.trim().startsWith(CLAUDE_TOKEN_PREFIX);
-}
-
-export function setupTokenCredential(token: string, now = Date.now()): OAuthCredential {
-  const access = token.trim();
-  if (!isClaudeToken(access)) {
+export function setupTokenCredential(token: string | undefined, now = Date.now()): OAuthCredential {
+  const access = token?.trim();
+  if (!access?.startsWith(CLAUDE_TOKEN_PREFIX)) {
     throw new ClaudeAuthError(
-      "That value is not a Claude OAuth token. Run `claude setup-token` and paste the token it prints.",
+      `Set ${CLAUDE_CODE_OAUTH_TOKEN_ENV} to a token from \`claude setup-token\` before starting Pi.`,
     );
   }
   return { type: "oauth", access, refresh: "", expires: now + SETUP_TOKEN_LIFETIME_MS };
@@ -39,6 +36,6 @@ export function isSetupTokenCredential(credential: OAuthCredential): boolean {
 
 export function setupTokenRefreshError(): ClaudeAuthError {
   return new ClaudeAuthError(
-    "This Claude token cannot be refreshed. Run `claude setup-token` again, then `/login claude` to store the new token.",
+    `This Claude token cannot be refreshed. Set ${CLAUDE_CODE_OAUTH_TOKEN_ENV} to a new setup token, restart Pi and run /login claude to import it.`,
   );
 }
