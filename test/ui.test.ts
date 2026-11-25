@@ -1,5 +1,4 @@
-import { ok } from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, expect, it } from "vitest";
 
 import { statusCard } from "../src/commands.ts";
 import { type CardTheme, renderClaudeCard } from "../src/ui.ts";
@@ -14,8 +13,8 @@ const options = { expanded: false, keyText: () => "", keyHint: () => "" };
 const render = (data: unknown): string =>
   renderClaudeCard({ data }, options, theme).render(120).join("\n");
 
-await describe("renderClaudeCard", async () => {
-  await it("renders the title and toned lines", () => {
+describe("renderClaudeCard", () => {
+  it("renders the title and toned lines", () => {
     const output = render(
       statusCard({
         configured: true,
@@ -26,30 +25,26 @@ await describe("renderClaudeCard", async () => {
       }),
     );
 
-    ok(output.includes("<b>Claude (Pro/Max/Ultra)</b>"));
-    ok(output.includes("<success>Signed in via saved credential</>"));
-    ok(output.includes("<accent>Active model: claude-opus-5-5</>"));
+    expect(output).toContain("<b>Claude (Pro/Max/Ultra)</b>");
+    expect(output).toContain("<success>Signed in via saved credential</>");
+    expect(output).toContain("<accent>Active model: claude-opus-5-5</>");
   });
 
-  await it("renders plain lines without a tone", () => {
+  it("renders plain lines without a tone", () => {
     const output = render({ title: "Claude", lines: [{ text: "plain" }], timestamp: 0 });
-    ok(output.includes("plain"));
+    expect(output).toContain("plain");
   });
 
-  await it("degrades gracefully without data", () => {
-    ok(render(undefined).includes("<dim>Claude status unavailable</>"));
+  it("degrades gracefully without data", () => {
+    expect(render(undefined)).toContain("<dim>Claude status unavailable</>");
   });
 
-  for (const saved of [
+  it.each([
     '{"title":"Older card"}',
     '{"title":"Older card","lines":[{"text":"ok"},null]}',
     '{"title":"Older card","lines":[{"text":"ok","tone":"retired"}]}',
     '{"title":4,"lines":[]}',
-  ]) {
-    // oxlint-disable-next-line no-await-in-loop -- Registering a test inside a suite resolves immediately.
-    await it(`falls back for incompatible saved data: ${saved}`, () => {
-      const data: unknown = JSON.parse(saved);
-      ok(render(data).includes("<dim>Claude status unavailable</>"));
-    });
-  }
+  ])("falls back for incompatible saved data: %s", (saved) => {
+    expect(render(JSON.parse(saved))).toContain("<dim>Claude status unavailable</>");
+  });
 });

@@ -1,43 +1,35 @@
-import { deepStrictEqual, ok, strictEqual } from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, expect, it } from "vitest";
 
 import { CLAUDE_PROVIDER_ID, claudeModels } from "../src/models.ts";
 
-await describe("claudeModels", async () => {
-  await it("copies the Anthropic catalog so limits and thinking support stay current", () => {
+describe("claudeModels", () => {
+  it("copies the Anthropic catalog so limits and thinking support stay current", () => {
     const models = claudeModels();
-    ok(models.length > 10);
-    strictEqual(
-      models.some((model) => model.id === "claude-opus-5-5"),
-      true,
-    );
+    expect(models.length).toBeGreaterThan(10);
+    expect(models.some((model) => model.id === "claude-opus-5-5")).toBe(true);
   });
 
-  await it("stamps the Claude subscription provider id", () => {
-    strictEqual(
-      claudeModels().every((model) => model.provider === CLAUDE_PROVIDER_ID),
-      true,
-    );
+  it("stamps the Claude subscription provider id", () => {
+    expect(claudeModels().every((model) => model.provider === CLAUDE_PROVIDER_ID)).toBe(true);
   });
 
-  await it("re-keys fallback models so Pi prices a fallback response under this provider", () => {
+  it("re-keys fallback models so Pi prices a fallback response under this provider", () => {
     const fallbacks = claudeModels().flatMap((model) => model.compat?.allowedFallbackModels ?? []);
-    ok(fallbacks.length > 0);
-    deepStrictEqual(
-      new Set(fallbacks.map((fallback) => fallback.provider)),
+    expect(fallbacks.length).toBeGreaterThan(0);
+    expect(new Set(fallbacks.map((fallback) => fallback.provider))).toEqual(
       new Set([CLAUDE_PROVIDER_ID]),
     );
   });
 
-  await it("keeps the fields Pi needs to stream and price a request", () => {
+  it("keeps the fields Pi needs to stream and price a request", () => {
     for (const model of claudeModels()) {
-      ok(model.id.length > 0);
-      ok(model.name.length > 0);
-      strictEqual(model.api, "anthropic-messages");
-      ok(model.contextWindow > 0);
-      ok(model.maxTokens > 0);
-      ok(model.input.length > 0);
-      ok(model.cost.input >= 0);
+      expect(model.id.length).toBeGreaterThan(0);
+      expect(model.name.length).toBeGreaterThan(0);
+      expect(model.api).toBe("anthropic-messages");
+      expect(model.contextWindow).toBeGreaterThan(0);
+      expect(model.maxTokens).toBeGreaterThan(0);
+      expect(model.input.length).toBeGreaterThan(0);
+      expect(model.cost.input).toBeGreaterThanOrEqual(0);
     }
   });
 });

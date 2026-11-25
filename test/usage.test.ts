@@ -1,14 +1,5 @@
-import {
-  deepStrictEqual,
-  ok,
-  partialDeepStrictEqual,
-  rejects,
-  strictEqual,
-  throws,
-} from "node:assert/strict";
-import { describe, it, mock } from "node:test";
+import { describe, expect, it, vi } from "vitest";
 
-import type { FetchLike } from "../src/oauth.ts";
 import {
   CLAUDE_USAGE_URL,
   fetchUsage,
@@ -16,20 +7,6 @@ import {
   formatUsage,
   parseUsage,
 } from "../src/usage.ts";
-
-/** Like a real request, the pending socket keeps the process alive until the abort; Node unrefs `AbortSignal.timeout`. */
-const hangUntilAborted: FetchLike = (_url, { signal }) =>
-  new Promise((_resolve, reject) => {
-    const socket = setTimeout(() => {}, 60_000);
-    signal?.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(socket);
-        reject(new Error("aborted"));
-      },
-      { once: true },
-    );
-  });
 
 const response = (body: unknown, status = 200): Response =>
   new Response(typeof body === "string" ? body : JSON.stringify(body), { status });
@@ -42,9 +19,9 @@ const usagePayload = {
   seven_day_oauth_apps: { utilization: 99 },
 };
 
-await describe("parseUsage", async () => {
-  await it("reads the documented usage windows", () => {
-    deepStrictEqual(parseUsage(usagePayload), {
+describe("parseUsage", () => {
+  it("reads the documented usage windows", () => {
+    expect(parseUsage(usagePayload)).toEqual({
       buckets: [
         { label: "5-hour window", utilization: 24.6, resetsAt: "2030-01-01T12:00:00Z" },
         { label: "7-day window", utilization: 41, resetsAt: "2030-01-02T12:00:00Z" },
@@ -54,27 +31,27 @@ await describe("parseUsage", async () => {
     });
   });
 
-  await it("skips windows the account does not have", () => {
-    strictEqual(parseUsage({ five_hour: { utilization: 1 } }).buckets.length, 1);
+  it("skips windows the account does not have", () => {
+    expect(parseUsage({ five_hour: { utilization: 1 } }).buckets).toHaveLength(1);
   });
 
-  await it("rejects a non-object response", () => {
-    throws(() => parseUsage([]), /unexpected usage response/);
+  it("rejects a non-object response", () => {
+    expect(() => parseUsage([])).toThrow(/unexpected usage response/);
   });
 
-  await it("rejects an account without usage windows", () => {
-    throws(() => parseUsage({}), /no usage windows/);
+  it("rejects an account without usage windows", () => {
+    expect(() => parseUsage({})).toThrow(/no usage windows/);
   });
 
-  await it("ignores malformed windows", () => {
-    throws(() => parseUsage({ five_hour: { utilization: "high" } }), /no usage windows/);
+  it("ignores malformed windows", () => {
+    expect(() => parseUsage({ five_hour: { utilization: "high" } })).toThrow(/no usage windows/);
   });
 });
 
-await describe("formatUsage", async () => {
-  await it("rounds utilization and shows reset times", () => {
+describe("formatUsage", () => {
+  it("rounds utilization and shows reset times", () => {
     const lines = formatUsage(parseUsage(usagePayload), () => "Mon 09:00");
-    deepStrictEqual(lines, [
+    expect(lines).toEqual([
       "5-hour window: 25% (resets Mon 09:00)",
       "7-day window: 41% (resets Mon 09:00)",
       "7-day Opus: 0%",
@@ -82,24 +59,24 @@ await describe("formatUsage", async () => {
     ]);
   });
 
-  await it("omits an unparseable reset time", () => {
+  it("omits an unparseable reset time", () => {
     const lines = formatUsage(parseUsage({ five_hour: { utilization: 5, resets_at: "nope" } }));
-    deepStrictEqual(lines, ["5-hour window: 5%"]);
+    expect(lines).toEqual(["5-hour window: 5%"]);
   });
 });
 
-await describe("formatResetTime", async () => {
-  await it("formats an ISO timestamp", () => {
-    ok(formatResetTime("2030-01-01T12:00:00Z"));
+describe("formatResetTime", () => {
+  it("formats an ISO timestamp", () => {
+    expect(formatResetTime("2030-01-01T12:00:00Z")).toBeTruthy();
   });
 
-  await it("rejects an invalid timestamp", () => {
-    strictEqual(formatResetTime("not-a-date"), undefined);
+  it("rejects an invalid timestamp", () => {
+    expect(formatResetTime("not-a-date")).toBeUndefined();
   });
 });
 
-await describe("fetchUsage", async () => {
-  await it("calls the OAuth usage endpoint with the documented headers", async () => {
+describe("fetchUsage", () => {
+  it("calls the OAuth usage endpoint with the documented headers", async () => {
     let captured: { url: string; headers: unknown } | undefined;
     const report = await fetchUsage("sk-ant-oat01-token", {
       fetch: async (url, init) => {
@@ -108,58 +85,64 @@ await describe("fetchUsage", async () => {
       },
     });
 
-    strictEqual(captured?.url, CLAUDE_USAGE_URL);
-    partialDeepStrictEqual(captured.headers, {
+    expect(captured?.url).toBe(CLAUDE_USAGE_URL);
+    expect(captured?.headers).toMatchObject({
       authorization: "Bearer sk-ant-oat01-token",
       "anthropic-beta": "oauth-2025-04-20",
       "x-app": "cli",
     });
-    strictEqual(report.buckets.length, 4);
+    expect(report.buckets).toHaveLength(4);
   });
 
-  await it("asks for a new sign-in when the token is rejected", async () => {
-    await rejects(fetchUsage("token", { fetch: async () => response({}, 401) }), /\/login claude/);
+  it("asks for a new sign-in when the token is rejected", async () => {
+    await expect(fetchUsage("token", { fetch: async () => response({}, 401) })).rejects.toThrow(
+      /\/login claude/,
+    );
   });
 
-  await it("reports other HTTP failures", async () => {
-    await rejects(fetchUsage("token", { fetch: async () => response({}, 503) }), /HTTP 503/);
+  it("reports other HTTP failures", async () => {
+    await expect(fetchUsage("token", { fetch: async () => response({}, 503) })).rejects.toThrow(
+      /HTTP 503/,
+    );
   });
 
-  await it("cancels an unused error body without masking the HTTP failure", async () => {
-    const cancellation = mock.fn(async () => {
+  it("cancels an unused error body without masking the HTTP failure", async () => {
+    const cancellation = vi.fn(async () => {
       throw new Error("cleanup failure");
     });
     const body = new ReadableStream({ cancel: cancellation });
 
-    await rejects(
+    await expect(
       fetchUsage("fixture", { fetch: async () => new Response(body, { status: 503 }) }),
-      /HTTP 503/,
+    ).rejects.toThrow(/HTTP 503/);
+    expect(cancellation).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports invalid JSON", async () => {
+    await expect(fetchUsage("token", { fetch: async () => response("<html>") })).rejects.toThrow(
+      /not valid JSON/,
     );
-    strictEqual(cancellation.mock.callCount(), 1);
   });
 
-  await it("reports invalid JSON", async () => {
-    await rejects(fetchUsage("token", { fetch: async () => response("<html>") }), /not valid JSON/);
-  });
-
-  await it("reports an unreachable endpoint", async () => {
-    await rejects(
+  it("reports an unreachable endpoint", async () => {
+    await expect(
       fetchUsage("token", {
         fetch: async () => {
           throw new Error("offline");
         },
       }),
-      /Could not reach/,
-    );
+    ).rejects.toThrow(/Could not reach/);
   });
 
-  await it("reports a timeout", async () => {
-    await rejects(
+  it("reports a timeout", async () => {
+    await expect(
       fetchUsage("token", {
         timeoutMs: 5,
-        fetch: hangUntilAborted,
+        fetch: (_input, init) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+          }),
       }),
-      /did not answer/,
-    );
+    ).rejects.toThrow(/did not answer/);
   });
 });
