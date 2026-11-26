@@ -1,7 +1,8 @@
-# A push to main stages the version in package.json on npm when npm does not have it,
-# then creates the GitHub release and its tag at the released commit. To release,
-# merge a pull request that changes `version`. The staged version becomes public
-# after a maintainer approves it with 2FA. An existing tag is never touched.
+# A push to main stages the version in package.json on npm when neither npm nor a
+# tag has it, then creates the GitHub release and its tag at the released commit.
+# To release, merge a pull request that changes `version`. The staged version becomes
+# public after a maintainer approves it with 2FA. npm does not list a staged version,
+# so the tag records that it was staged. An existing tag is never touched.
 
 name: Release
 
@@ -71,15 +72,14 @@ jobs:
         run: |
           tagged="$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$TAG" | jq --arg ref "refs/tags/$TAG" 'any(.ref == $ref)')"
           if [[ "$tagged" == "true" && "$PUBLISHED" != "true" ]]; then
-            echo "::error::The tag $TAG exists, but npm does not have this version. Delete the tag or release under another version."
-            exit 1
+            echo "::notice::$TAG exists, so this version is staged on npm. Approve it with 2FA to publish it."
           fi
           echo "tagged=$tagged" >> "$GITHUB_OUTPUT"
 
   publish:
     name: Stage on npm
     needs: version
-    if: needs.version.outputs.published != 'true' && github.repository == 'just-joshn/pi-claude-oauth'
+    if: needs.version.outputs.published != 'true' && needs.version.outputs.tagged != 'true' && github.repository == 'just-joshn/pi-claude-oauth'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
