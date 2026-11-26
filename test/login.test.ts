@@ -390,6 +390,34 @@ describe("login", () => {
     });
   });
 
+  it("accepts a pasted redirect after the browser listener times out", async () => {
+    const fake = interaction("browser");
+    const { calls, dependencies } = recordExchange();
+    const value: ProviderAuthInteraction = {
+      ...fake.interaction,
+      prompt: async (prompt) => {
+        if (prompt.type !== "manual_code") {
+          return fake.interaction.prompt(prompt);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        const url = authUrl(fake.events);
+        const redirect = new URL(url.searchParams.get("redirect_uri") ?? "");
+        redirect.searchParams.set("code", "pasted-code");
+        redirect.searchParams.set("state", url.searchParams.get("state") ?? "");
+        await expect(fetch(redirect)).rejects.toThrow();
+        return redirect.href;
+      },
+    };
+
+    await login(value, {
+      ...dependencies,
+      startServer: (options) => startLoopbackServer({ ...options, ports: [0], timeoutMs: 10 }),
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ code: "pasted-code" });
+  });
+
   it("accepts a pasted redirect URL when no callback server can start", async () => {
     const { interaction: fake } = interaction("browser", [
       "http://localhost:53692/callback?code=pasted-code",
