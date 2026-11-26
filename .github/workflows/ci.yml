@@ -64,9 +64,9 @@ jobs:
             echo "::error file=CHANGELOG.md::CHANGELOG.md needs a dated '## $version (YYYY-MM-DD)' entry"
             exit 1
           fi
-          unknown=$(grep -nE '^[A-Z][A-Z ]*:$' CHANGELOG.md | grep -vE ':(BREAKING CHANGES|NEW FEATURES|ADDED|CHANGED):$' || true)
+          unknown=$(grep -nE '^[A-Z][A-Z ]*:$' CHANGELOG.md | grep -vE ':(NEW FEATURES|BREAKING CHANGES|ADDED|CHANGED|REMOVED):$' || true)
           if [[ -n "$unknown" ]]; then
-            echo "::error file=CHANGELOG.md::Use only BREAKING CHANGES:, NEW FEATURES:, ADDED: and CHANGED: sections. Found:"
+            echo "::error file=CHANGELOG.md::Use only NEW FEATURES:, BREAKING CHANGES:, ADDED:, CHANGED: and REMOVED: sections. Found:"
             echo "$unknown"
             exit 1
           fi

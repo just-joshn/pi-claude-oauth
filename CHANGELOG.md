@@ -12,7 +12,7 @@ CHANGED:
 
 - CI runs on every pull request, including stacked ones, as two jobs: Lint (formatting, oxlint, types, the version and changelog check, and the package contents) and Test, which runs the tests with the coverage gate and a smoke test on real Pi on Node 22.19.0, 24 and 26. The check named `Verify` is gone.
 - Releases run in a separate Release workflow that calls CI on the pushed commit, stages the version on npm only when npm does not have it, and creates the tag and GitHub release at the released commit. Rerunning a release no longer needs the previous run's tarball.
-- The changelog uses `## X.Y.Z (YYYY-MM-DD)` headings, or `(Unreleased)` for a version not yet in `package.json`, with only `BREAKING CHANGES:`, `NEW FEATURES:`, `ADDED:` and `CHANGED:` sections. CI requires a dated entry for the version in `package.json` and rejects any other section.
+- The changelog uses `## X.Y.Z (YYYY-MM-DD)` headings, or `(Unreleased)` for a version not yet in `package.json`, with only `NEW FEATURES:`, `BREAKING CHANGES:`, `ADDED:`, `CHANGED:` and `REMOVED:` sections, in that order. CI requires a dated entry for the version in `package.json` and rejects any other section.
 
 ## 0.1.5 (2026-11-26)
 
