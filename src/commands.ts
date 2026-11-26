@@ -113,7 +113,6 @@ export function usageCard(report: UsageReport, now = Date.now()): CardData {
   };
 }
 
-/** Pi wraps the provider's refresh error as `cause`; the cause carries the actionable text. */
 function describeError(error: unknown): string {
   if (!(error instanceof Error)) {
     return String(error);
