@@ -30,9 +30,14 @@ export interface LoginDependencies {
   readonly startServer?: typeof startLoopbackServer;
 }
 
-function requireCode(input: string, expectedState: string): string {
-  const parsed = parseAuthorizationInput(input);
-  if (parsed.state !== undefined && parsed.state !== expectedState) {
+interface PendingSignIn {
+  readonly state: string;
+  readonly signInLink: string;
+}
+
+function requireCode(input: string, pending: PendingSignIn): string {
+  const parsed = parseAuthorizationInput(input, pending.signInLink);
+  if (parsed.state !== undefined && parsed.state !== pending.state) {
     throw new InvalidPasteError("The pasted sign-in result belongs to a different request.");
   }
   if (parsed.failure) {
@@ -47,20 +52,20 @@ function requireCode(input: string, expectedState: string): string {
 async function promptForCode(
   interaction: ProviderAuthInteraction,
   prompt: AuthPrompt,
-  state: string,
+  pending: PendingSignIn,
 ): Promise<string> {
   const pasted = await interaction.prompt(prompt);
   if (!pasted.trim()) {
-    return promptForCode(interaction, prompt, state);
+    return promptForCode(interaction, prompt, pending);
   }
   try {
-    return requireCode(pasted, state);
+    return requireCode(pasted, pending);
   } catch (error) {
     if (!(error instanceof InvalidPasteError)) {
       throw error;
     }
     interaction.notify({ type: "info", message: error.message });
-    return promptForCode(interaction, prompt, state);
+    return promptForCode(interaction, prompt, pending);
   }
 }
 
@@ -68,7 +73,7 @@ async function readBrowserCode(
   interaction: ProviderAuthInteraction,
   server: LoopbackServer | undefined,
   placeholder: string,
-  state: string,
+  pending: PendingSignIn,
 ): Promise<string> {
   const dismissPrompt = new AbortController();
   const pasted = promptForCode(
@@ -80,7 +85,7 @@ async function readBrowserCode(
       placeholder,
       signal: AbortSignal.any([interaction.signal, dismissPrompt.signal]),
     },
-    state,
+    pending,
   );
   if (!server) return pasted;
 
@@ -119,14 +124,15 @@ async function loginWithBrowser(
   let code: string;
   try {
     if (interaction.signal.aborted) throw new ClaudeAuthError("Claude sign-in was cancelled.");
+    const signInLink = buildAuthorizeUrl({ redirectUri, state, challenge });
     interaction.notify({
       type: "auth_url",
-      url: buildAuthorizeUrl({ redirectUri, state, challenge }),
+      url: signInLink,
       instructions:
         "Complete sign-in in your browser. If the browser runs on another machine, paste the final redirect URL here.",
     });
 
-    code = await readBrowserCode(interaction, server, redirectUri, state);
+    code = await readBrowserCode(interaction, server, redirectUri, { state, signInLink });
   } finally {
     server?.close();
   }
@@ -139,10 +145,11 @@ async function loginWithCopyCode(
 ): Promise<OAuthCredential> {
   const { state, verifier, challenge } = await createAuthorizationSession();
   const redirectUri = CLAUDE_COPY_CODE_REDIRECT_URI;
+  const signInLink = buildAuthorizeUrl({ redirectUri, state, challenge });
 
   interaction.notify({
     type: "auth_url",
-    url: buildAuthorizeUrl({ redirectUri, state, challenge }),
+    url: signInLink,
     instructions: "Complete sign-in, then copy the code Anthropic shows and paste it here.",
   });
 
@@ -154,7 +161,7 @@ async function loginWithCopyCode(
       placeholder: "code#state",
       signal: interaction.signal,
     },
-    state,
+    { state, signInLink },
   );
   return exchangeCode(interaction, dependencies, { code, state, verifier, redirectUri });
 }

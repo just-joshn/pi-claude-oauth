@@ -15,13 +15,6 @@ export const CLAUDE_OAUTH_BETA = "oauth-2025-04-20";
 export const CLAUDE_TOKEN_PREFIX = "sk-ant-oat";
 
 const AUTHORIZE_PATH = "/oauth/authorize";
-const SIGN_IN_LINK_PARAMS = [
-  "client_id",
-  "response_type",
-  "redirect_uri",
-  "code_challenge",
-  "code_challenge_method",
-] as const;
 const TOKEN_TIMEOUT_MS = 30_000;
 const DEFAULT_TOKEN_LIFETIME_SECONDS = 3_600;
 
@@ -135,25 +128,29 @@ export function authorizationFailure(
   return { title: "Sign-in failed", detail, message: `Claude sign-in failed: ${detail}` };
 }
 
-export function parseAuthorizationInput(input: string): {
+const SIGN_IN_LINK_PASTED =
+  "That is the sign-in link. Paste the address you land on after signing in.";
+
+export function parseAuthorizationInput(
+  input: string,
+  signInLink?: string,
+): {
   code?: string | undefined;
   state?: string | undefined;
   failure?: string | undefined;
 } {
   const value = unwrap(input.replace(/\s+/g, ""));
   if (!value) return {};
+  if (signInLink?.includes(value)) {
+    throw new InvalidPasteError(SIGN_IN_LINK_PASTED);
+  }
 
   const queryStart = value.indexOf("?");
-  if (queryStart !== -1 || /(^|&)\w+=/.test(value)) {
+  if (queryStart !== -1 || /(^|&)(code|error)=/.test(value)) {
     const [query = ""] = value.slice(queryStart + 1).split("#", 1);
     const params = new URLSearchParams(query);
-    if (
-      SIGN_IN_LINK_PARAMS.some((name) => params.has(name)) ||
-      value.slice(0, queryStart).endsWith(AUTHORIZE_PATH)
-    ) {
-      throw new InvalidPasteError(
-        "That is the sign-in link. Paste the address you land on after signing in.",
-      );
+    if (params.has("client_id") || value.slice(0, queryStart).endsWith(AUTHORIZE_PATH)) {
+      throw new InvalidPasteError(SIGN_IN_LINK_PASTED);
     }
     return {
       code: params.get("code") ?? undefined,

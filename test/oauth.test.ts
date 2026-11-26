@@ -91,6 +91,11 @@ describe("parseAuthorizationInput", () => {
   it.each([
     signInLink.slice(signInLink.indexOf("/authorize"), signInLink.indexOf("client_id") + 7),
     signInLink.slice(signInLink.indexOf("code_challenge=") - 20, signInLink.indexOf("&state")),
+    signInLink.slice(signInLink.indexOf("ode=true"), signInLink.indexOf("response_type") + 4),
+    signInLink.slice(
+      signInLink.indexOf("&response_type") - 15,
+      signInLink.indexOf("redirect_uri") + 20,
+    ),
     signInLink.slice(signInLink.indexOf("state=") + 6),
   ])("rejects the fragment %s of the sign-in link shown for this login", (input) => {
     expect(() => parseAuthorizationInput(` ${input} `, signInLink)).toThrow(
@@ -175,8 +180,6 @@ describe("parseAuthorizationInput", () => {
     "https://claude.ai/oauth/authorize?code=true&client_",
     "https://claude.com/cai/oauth \n /authorize?code=true",
     " https://claude.com/cai/oauth \n /authorize?code=true&client_ ",
-    "ode=true&client_id=9d1c250a-e61b-44d9-88ed-5944d1962f5e&resp",
-    "ed-5944d1962f5e&response_type=code&redirect_uri=https%3A%2F%",
   ])("rejects a partly copied sign-in link %s", (input) => {
     expect(() => parseAuthorizationInput(input)).toThrow(
       "That is the sign-in link. Paste the address you land on after signing in.",
