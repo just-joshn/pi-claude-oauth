@@ -143,6 +143,7 @@ describe("parseAuthorizationInput", () => {
       "/callback?error=temporarily_unavailable&state=def",
       "Claude sign-in failed: temporarily_unavailable",
     ],
+    ["error=access_denied&state=def", "Claude sign-in was declined: access_denied"],
   ])("reads a pasted error %s with its state", (input, failure) => {
     expect(parseAuthorizationInput(input)).toEqual({ code: undefined, state: "def", failure });
   });
@@ -152,6 +153,8 @@ describe("parseAuthorizationInput", () => {
     "https://claude.com/cai/oauth/authorize?code=tr",
     "claude.com/cai/oauth/authorize?code=true&client_",
     "https://claude.ai/oauth/authorize?code=true&client_",
+    "https://claude.com/cai/oauth \n /authorize?code=true",
+    " https://claude.com/cai/oauth \n /authorize?code=true&client_ ",
   ])("rejects a partly copied sign-in link %s", (input) => {
     expect(() => parseAuthorizationInput(input)).toThrow(
       "That is the sign-in link. Paste the address you land on after signing in.",
