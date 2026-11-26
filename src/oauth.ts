@@ -134,7 +134,7 @@ export function parseAuthorizationInput(input: string): {
     return {
       code: params.get("code") ?? undefined,
       state: params.get("state") ?? undefined,
-      denial: error && (params.get("error_description") ?? error),
+      denial: error && (params.get("error_description") || error),
     };
   }
 

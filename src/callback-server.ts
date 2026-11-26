@@ -58,7 +58,7 @@ function replyTo(request: IncomingMessage, state: string): Reply {
 
   const error = url.searchParams.get("error");
   if (error) {
-    const description = url.searchParams.get("error_description") ?? error;
+    const description = url.searchParams.get("error_description") || error;
     return {
       status: 400,
       title: "Sign-in declined",
