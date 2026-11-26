@@ -51,7 +51,8 @@ export CLAUDE_CODE_OAUTH_TOKEN="$(claude setup-token)"
 ```
 
 When a credential is stored, it wins over the environment variable. A setup token cannot be refreshed: when it expires,
-export a new one and restart Pi, or paste it with `/login claude` and **Sign in with an API key**.
+run `/login claude` and paste a new one with **Sign in with an API key**, or export it, restart Pi, and import it with
+**Sign in with a Claude subscription** → **Import setup token from environment**.
 
 ## Use it
 
@@ -75,7 +76,7 @@ This extension does not bypass anything. It performs the same OAuth client, scop
 uses, and it sends the tokens to Anthropic's API.
 
 Pi's built-in billing warning applies only to its `anthropic` provider, not this extension's `claude` provider. The
-`/login claude` method picker shows the equivalent warning instead: third-party harness usage is billed per token as
+`/login claude` sign-in prompts show the equivalent warning instead: third-party harness usage is billed per token as
 extra usage, outside your Claude plan limits. Manage extra usage at https://claude.ai/settings/usage.
 
 Treat subscription OAuth as an account-level credential, not as a way to move plan limits into another harness. Review

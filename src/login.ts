@@ -22,6 +22,9 @@ import {
   parseAuthorizationInput,
 } from "./oauth.ts";
 
+export const BILLING_WARNING =
+  "Third-party harness usage is billed per token as extra usage, outside your plan limits.";
+
 export interface LoginDependencies {
   readonly fetch?: FetchLike;
   readonly startServer?: typeof startLoopbackServer;
@@ -162,8 +165,7 @@ export async function login(
 ): Promise<OAuthCredential> {
   const method = await interaction.prompt({
     type: "select",
-    message:
-      "Sign in to Claude. Third-party harness usage is billed per token as extra usage, outside your plan limits.",
+    message: `Sign in to Claude. ${BILLING_WARNING}`,
     options: [
       {
         id: "browser",

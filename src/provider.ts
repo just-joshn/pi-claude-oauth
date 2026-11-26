@@ -9,7 +9,7 @@ import {
   setupTokenRefreshError,
   toOAuthCredential,
 } from "./credential.ts";
-import { login } from "./login.ts";
+import { BILLING_WARNING, login } from "./login.ts";
 import { CLAUDE_PROVIDER_ID, CLAUDE_PROVIDER_NAME, claudeModels } from "./models.ts";
 import { CLAUDE_TOKEN_PREFIX, ClaudeAuthError, refreshAccessToken } from "./oauth.ts";
 
@@ -50,7 +50,7 @@ function claudeEnvToken(): ApiKeyAuth {
     async login(interaction) {
       const pasted = await interaction.prompt({
         type: "secret",
-        message: "Paste a token from `claude setup-token`:",
+        message: `${BILLING_WARNING} Paste a token from \`claude setup-token\`:`,
         placeholder: `${CLAUDE_TOKEN_PREFIX}01-...`,
         signal: interaction.signal,
       });
