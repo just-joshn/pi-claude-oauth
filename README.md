@@ -14,7 +14,8 @@ The extension registers a native Pi provider named `claude`. The `claude` provid
 
 ## Requirements
 
-- Pi 1.6.0 or newer.
+- Pi 1.6.0 or newer. The package smoke test uses Pi 1.6.1.
+- Node.js on Linux or macOS. Use 22.23.5 or newer in the 22.x series, 24.22.3 or newer in the 24.x series, or 26.13.1 or newer in the 26.x series. CI also runs on Windows.
 - A Claude Pro, Max, or Ultra subscription with Claude Code access.
 
 ## Install the extension
@@ -180,23 +181,32 @@ The constants in `src/oauth.ts` mirror Claude Code 2.1.331:
 
 ### Development tool versions
 
-- Use Bun 1.4.5 to install and format.
-- Use Node 22.19 or later to run the tests.
+- Use npm 11.20.0 and a supported Node.js version.
 - Pi loads the TypeScript sources directly, so there is no build step.
+- TypeScript checks the extension, tests, and scripts. It skips dependency declaration-file checks because Pi 1.6 uses JSON imports in those files without NodeNext import attributes.
 
 ### Development commands
 
 ```bash
-bun install --frozen-lockfile
-bun run test           # Vitest; use bun run test:watch while editing
-bun run test:coverage  # 80% minimum statement/branch/function/line coverage per source file
-bun run format         # apply formatting; use bun run format:check to check only
-bun run lint           # type-aware Oxlint
-bun run typecheck      # tsc --noEmit
-bun run check          # format:check, lint, typecheck and test:coverage
-node scripts/smoke.ts  # smoke test on real Pi; uses $PI_BIN, or pi on your PATH
-pi -e .                # load this checkout in Pi
+npm ci --ignore-scripts
+npm run check          # check Biome formatting and lint rules, then typecheck
+npm test               # run the full test suite
+npm run test:watch     # rerun affected tests while editing
+npm run test:unit      # run tests for individual modules
+npm run test:integration # run tests across extension and host boundaries
+npm run test:coverage  # run the test suite with V8 coverage thresholds
+npm run bench          # measure offline copy-code sign-in with and without paste retries
+npm run audit          # fail on high or critical dependency advisories
+npm run pack:check     # list the files that would ship
+npm run test:package   # install the tarball in a temporary directory and load it in offline Pi
+npm run dev            # load this checkout in Pi
 ```
+
+If Pi has no configured model, use `/login` before sending a prompt. `npm run dev` uses your Pi configuration.
+
+### Versioning
+
+Before 1.0, releases can contain breaking changes. Check the `BREAKING CHANGES` section in [CHANGELOG.md](CHANGELOG.md) before upgrading.
 
 ### Source layout
 

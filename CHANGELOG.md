@@ -2,6 +2,12 @@
 
 This changelog is for people who install the package. It lists, for each version, the changes that reach them, one change per entry. A version with no user-facing changes of its own has no sections; a short note under its heading says so. CI, tests, tooling and other changes that never reach the npm package stay out of it.
 
+## 0.2.0 (2026-11-26)
+
+BREAKING CHANGES:
+
+- The package requires Node.js 22.23.5 or newer in the 22.x series, 24.22.3 or newer in the 24.x series, or 26.13.1 or newer in the 26.x series. Earlier releases accepted every version from 22.19.0 onward.
+
 ## 0.1.6 (2026-11-26)
 
 CHANGED:

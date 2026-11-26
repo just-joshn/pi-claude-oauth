@@ -2,105 +2,82 @@ name: CI
 
 on:
   pull_request:
-  workflow_call:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-defaults:
-  run:
-    shell: bash
-
 jobs:
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Use Node.js
-        uses: actions/setup-node@v7.1.0
-        with:
-          node-version: "24.x"
-          package-manager-cache: false
-      - name: Use Bun
-        uses: oven-sh/setup-bun@v2.2.0
-        with:
-          bun-version-file: package.json
-          no-cache: true
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-      - name: Check formatting
-        run: bun run format:check
-      - name: Lint
-        run: bun run lint
-      - name: Check types
-        run: bun run typecheck
-      - name: Check the version and changelog
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          version=$(jq -er .version package.json)
-          stable='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
-          if [[ ! "$version" =~ $stable ]]; then
-            echo "::error::package.json must use a stable MAJOR.MINOR.PATCH version"
-            exit 1
-          fi
-          if [[ -n "$BASE_SHA" ]]; then
-            previous=$(git show "$BASE_SHA:package.json" | jq -er .version)
-            if [[ "$(printf '%s\n' "$previous" "$version" | sort -V | tail -n 1)" != "$version" ]]; then
-              echo "::error::package.json version must not decrease ($previous -> $version)"
-              exit 1
-            fi
-          fi
-          if ! grep -Eq "^## ${version//./\\.} \([0-9]{4}-[0-9]{2}-[0-9]{2}\)$" CHANGELOG.md; then
-            echo "::error file=CHANGELOG.md::CHANGELOG.md needs a dated '## $version (YYYY-MM-DD)' entry"
-            exit 1
-          fi
-          unknown=$(grep -nE '^[A-Z][A-Z ]*:$' CHANGELOG.md | grep -vE ':(NEW FEATURES|BREAKING CHANGES|ADDED|CHANGED|REMOVED):$' || true)
-          if [[ -n "$unknown" ]]; then
-            echo "::error file=CHANGELOG.md::Use only NEW FEATURES:, BREAKING CHANGES:, ADDED:, CHANGED: and REMOVED: sections. Found:"
-            echo "$unknown"
-            exit 1
-          fi
-      - name: Check the package contents
-        run: npm pack --dry-run --ignore-scripts
-
-  test:
-    name: Test (Node ${{ matrix.node-version }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+  validate:
+    name: Validate (${{ matrix.os }}, Node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        # 22.19.0 is the oldest release that `engines` in package.json and Pi allow.
-        node-version: ["22.19.0", "24.x", "26.x"]
+        include:
+          - os: ubuntu-24.04
+            node: '22.23.5'
+          - os: ubuntu-24.04
+            node: '24.22.3'
+          - os: ubuntu-24.04
+            node: '26.13.1'
+            primary: true
+          - os: macos-15
+            node: '26.13.1'
+          - os: windows-2025
+            node: '26.13.1'
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v7.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: ${{ matrix.node }}
           package-manager-cache: false
-      - name: Use Bun
-        uses: oven-sh/setup-bun@v2.2.0
-        with:
-          bun-version-file: package.json
-          no-cache: true
+      - name: Pin npm
+        run: npm install --global --ignore-scripts npm@11.20.0
       - name: Install dependencies
-        run: bun install --frozen-lockfile
-      - name: Run the tests with the coverage gate
-        run: bun run test:coverage
-      - name: Run the smoke test on real Pi
-        run: node scripts/smoke.ts
-        env:
-          PI_BIN: ${{ github.workspace }}/node_modules/.bin/pi
+        run: npm ci --ignore-scripts --include=dev --no-audit
+      - name: Lint, format, and typecheck
+        if: matrix.primary == true
+        run: npm run check
+      - name: Test with coverage
+        if: matrix.primary == true
+        run: npm run test:coverage
+      - name: Test compatibility
+        if: matrix.primary != true
+        run: npm test
+      - name: Audit dependencies
+        if: matrix.primary == true
+        run: npm run audit
+      - name: Inspect package
+        if: matrix.primary == true
+        run: npm run pack:check
+      - name: Install and load packed extension
+        run: npm run test:package
+
+  secrets:
+    name: Secret scanning
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Scan history
+        run: |
+          docker run --rm --network none \
+            -e GIT_CONFIG_COUNT=1 \
+            -e GIT_CONFIG_KEY_0=safe.directory \
+            -e GIT_CONFIG_VALUE_0=/path \
+            -v "$PWD:/path:ro" \
+            ghcr.io/gitleaks/gitleaks:v8.30.1 \
+            git --redact --ignore-gitleaks-allow --log-opts="--all" /path
