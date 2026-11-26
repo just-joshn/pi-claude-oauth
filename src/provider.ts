@@ -29,6 +29,7 @@ function claudeOAuth(): OAuthAuth {
       return toOAuthCredential({ ...token, refresh: token.refresh ?? credential.refresh });
     },
     async toAuth(credential: OAuthCredential) {
+      // Pi's Anthropic API sends `sk-ant-oat` keys as Bearer tokens with the OAuth beta and Claude Code headers.
       if (!isSetupTokenCredential(credential)) {
         return { apiKey: credential.access };
       }
