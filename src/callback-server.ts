@@ -22,7 +22,6 @@ interface LoopbackServerOptions {
 
 export interface LoopbackServer {
   readonly redirectUri: string;
-  /** Stays pending if the server closes before a code arrives. */
   waitForCode(): Promise<string>;
   close(): void;
 }

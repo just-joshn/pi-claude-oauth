@@ -10,7 +10,6 @@ export const CLAUDE_SCOPES = [
   "user:sessions:claude_code",
 ] as const;
 
-/** Beta flag the Messages API requires for OAuth access tokens. */
 export const CLAUDE_OAUTH_BETA = "oauth-2025-04-20";
 
 export const CLAUDE_TOKEN_PREFIX = "sk-ant-oat";
