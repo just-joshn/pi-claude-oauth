@@ -14,7 +14,10 @@ describe("startLoopbackServer", () => {
 
     const response = await fetch(`${server.redirectUri}?code=abc&state=${STATE}`);
     expect(response.status).toBe(200);
-    expect(await response.text()).toContain("Signed in");
+    const body = await response.text();
+    expect(body).toContain("Authorization received");
+    expect(body).toContain("Return to Pi to finish signing in");
+    expect(body).not.toContain("Signed in");
     expect(await waiting).toBe("abc");
   });
 
