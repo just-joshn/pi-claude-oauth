@@ -195,8 +195,9 @@ describe("startLoopbackServer", () => {
     }
   });
 
-  it("times out without a browser", async () => {
+  it("stops listening when no browser arrives in time", async () => {
     const server = await startLoopbackServer({ state: STATE, ports: [0], timeoutMs: 10 });
-    await expect(server.waitForCode()).rejects.toThrow(/timed out/);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await expect(fetch(`${server.redirectUri}?code=abc&state=${STATE}`)).rejects.toThrow();
   });
 });

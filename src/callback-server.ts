@@ -157,10 +157,7 @@ export async function startLoopbackServer(options: LoopbackServerOptions): Promi
     reject(new ClaudeAuthError(message));
   };
   const onAbort = () => fail("Claude sign-in was cancelled.");
-  const timer = setTimeout(
-    () => fail("The browser sign-in timed out. Run `/login claude` to try again."),
-    options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-  );
+  const timer = setTimeout(close, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   timer.unref();
   options.signal?.addEventListener("abort", onAbort, { once: true });
 
