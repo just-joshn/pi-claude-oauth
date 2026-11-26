@@ -187,11 +187,10 @@ function redact(serverText: string, sent: Record<string, string>): string {
 function describeFailure(status: number, payload: unknown, sent: Record<string, string>): string {
   const { code, description } = failureDetails(payload);
 
-  if (code === "invalid_grant" && sent["grant_type"] === "authorization_code") {
-    return "Claude rejected the authorization code (invalid_grant). It may have expired or already been used. Run `/login claude` to try again.";
-  }
   if (code === "invalid_grant") {
-    return "Claude rejected the saved sign-in (invalid_grant). Run `/login claude` to sign in again.";
+    return sent["grant_type"] === "authorization_code"
+      ? "Claude rejected the authorization code (invalid_grant). It may have expired or already been used. Run `/login claude` to try again."
+      : "Claude rejected the saved sign-in (invalid_grant). Run `/login claude` to sign in again.";
   }
   if (status === 429) {
     return "Claude is rate limiting sign-in (HTTP 429). Wait a moment and try again.";
