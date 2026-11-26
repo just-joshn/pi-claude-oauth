@@ -50,6 +50,7 @@ function harness() {
 
 function context(notifications: Notification[], overrides: CtxOverrides = {}): CommandContext {
   return {
+    hasUI: true,
     modelRegistry: {
       getProviderAuthStatus: () => ({ configured: true, source: "stored" }),
       getAll: () => CATALOG,
@@ -236,6 +237,50 @@ describe("/claude command", () => {
     const { command, notifications } = harness();
     await command.handler("bogus", context(notifications));
     expect(notifications.at(-1)?.level).toBe("error");
+  });
+
+  it("persists status and usage cards without calling an unavailable UI", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({ five_hour: { utilization: 30 } }),
+    );
+    const { cards, notifications, command } = harness();
+    const ctx = {
+      ...context(notifications),
+      hasUI: false,
+      ui: { notify: vi.fn(), setStatus: vi.fn() },
+    };
+
+    await command.handler("status", ctx);
+    await command.handler("usage", ctx);
+
+    expect(cards.map((card) => card.title)).toEqual([
+      "Claude (Pro/Max/Ultra)",
+      "Claude (Pro/Max/Ultra) usage",
+    ]);
+    expect(cards[1]?.lines).toEqual([{ text: "5-hour window: 30%", tone: "muted" }]);
+    expect(ctx.ui.notify).not.toHaveBeenCalled();
+    expect(ctx.ui.setStatus).not.toHaveBeenCalled();
+  });
+
+  it("does not call an unavailable UI for hints or usage failures", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({}, { status: 401 }));
+    const { cards, notifications, command } = harness();
+    const ui = { notify: vi.fn(), setStatus: vi.fn() };
+    const ctx = { ...context(notifications), hasUI: false, ui };
+
+    await command.handler("login", ctx);
+    await command.handler("logout", ctx);
+    await command.handler("bogus", ctx);
+    await command.handler("usage", ctx);
+    await command.handler("usage", {
+      ...context(notifications, { accessToken: undefined }),
+      hasUI: false,
+      ui,
+    });
+
+    expect(cards).toHaveLength(0);
+    expect(ui.notify).not.toHaveBeenCalled();
+    expect(ui.setStatus).not.toHaveBeenCalled();
   });
 
   it("completes subcommands by prefix", () => {

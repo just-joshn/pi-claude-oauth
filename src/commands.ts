@@ -8,6 +8,7 @@ import { fetchUsage, formatUsage, type UsageReport } from "./usage.ts";
 export const CLAUDE_CARD_TYPE = "claude-card";
 
 export interface CommandContext {
+  readonly hasUI: ExtensionCommandContext["hasUI"];
   readonly model: ExtensionCommandContext["model"];
   readonly modelRegistry: Pick<
     ExtensionCommandContext["modelRegistry"],
@@ -142,20 +143,24 @@ function showStatus(pi: CommandHost, ctx: CommandContext): void {
   );
 }
 
-async function showUsage(pi: CommandHost, ctx: CommandContext): Promise<void> {
-  ctx.ui.setStatus("claude-usage", "Fetching Claude usage...");
+async function showUsage(
+  pi: CommandHost,
+  registry: CommandContext["modelRegistry"],
+  ui: CommandContext["ui"] | undefined,
+): Promise<void> {
+  ui?.setStatus("claude-usage", "Fetching Claude usage...");
   try {
     // `getApiKeyForProvider` swallows refresh errors and would report "not signed in".
-    const accessToken = (await ctx.modelRegistry.getProviderAuth(CLAUDE_PROVIDER_ID))?.auth.apiKey;
+    const accessToken = (await registry.getProviderAuth(CLAUDE_PROVIDER_ID))?.auth.apiKey;
     if (!accessToken) {
-      ctx.ui.notify(`No Claude sign-in found. Run /login ${CLAUDE_PROVIDER_ID} first.`, "warning");
+      ui?.notify(`No Claude sign-in found. Run /login ${CLAUDE_PROVIDER_ID} first.`, "warning");
       return;
     }
     pi.appendEntry(CLAUDE_CARD_TYPE, usageCard(await fetchUsage(accessToken)));
   } catch (error) {
-    ctx.ui.notify(describeError(error), "error");
+    ui?.notify(describeError(error), "error");
   } finally {
-    ctx.ui.setStatus("claude-usage", undefined);
+    ui?.setStatus("claude-usage", undefined);
   }
 }
 
@@ -171,25 +176,26 @@ export function registerClaudeCommand(pi: CommandHost): void {
     handler: async (args, ctx) => {
       const [first] = args.trim().split(/\s+/);
       const subcommand = first || "status";
+      const ui = ctx.hasUI ? ctx.ui : undefined;
 
       switch (subcommand) {
         case "status":
           showStatus(pi, ctx);
           return;
         case "usage":
-          await showUsage(pi, ctx);
+          await showUsage(pi, ctx.modelRegistry, ui);
           return;
         case "login":
-          ctx.ui.notify(
+          ui?.notify(
             `Run /login ${CLAUDE_PROVIDER_ID}, then choose a Claude sign-in method.`,
             "info",
           );
           return;
         case "logout":
-          ctx.ui.notify(`Run /logout, then choose ${CLAUDE_PROVIDER_NAME}.`, "info");
+          ui?.notify(`Run /logout, then choose ${CLAUDE_PROVIDER_NAME}.`, "info");
           return;
         default:
-          ctx.ui.notify(
+          ui?.notify(
             `Unknown /claude subcommand "${subcommand}". Use status, usage, login, or logout.`,
             "error",
           );
