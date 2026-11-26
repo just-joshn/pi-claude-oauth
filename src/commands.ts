@@ -114,14 +114,16 @@ export function usageCard(report: UsageReport, now = Date.now()): CardData {
 }
 
 function describeError(error: unknown): string {
-  if (!(error instanceof Error)) {
-    return String(error);
-  }
-  if (error.cause === undefined) {
-    return error.message;
-  }
-  const cause = describeError(error.cause);
-  return error.message.includes(cause) ? error.message : `${error.message}: ${cause}`;
+  let text = "";
+  let current: unknown = error;
+  do {
+    const message = current instanceof Error ? current.message : String(current);
+    if (!text.includes(message)) {
+      text = text ? `${text}: ${message}` : message;
+    }
+    current = current instanceof Error ? current.cause : undefined;
+  } while (current !== undefined);
+  return text;
 }
 
 function showStatus(pi: CommandHost, ctx: CommandContext): void {

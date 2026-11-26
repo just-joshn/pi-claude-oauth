@@ -85,7 +85,13 @@ export function parseUsage(value: unknown): UsageReport {
 export function formatResetTime(value: string): string | undefined {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return undefined;
-  return date.toLocaleString(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export function formatUsage(
