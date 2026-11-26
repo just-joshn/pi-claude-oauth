@@ -32,7 +32,6 @@ if (!apiKey) throw new Error('API_KEY not configured')
 If a security issue is found:
 
 1. STOP immediately.
-2. Use the `security-reviewer` agent.
-3. Fix CRITICAL issues before continuing.
-4. Rotate any exposed secrets.
-5. Review the entire codebase for similar issues.
+2. Fix CRITICAL issues before continuing.
+3. Rotate any exposed secrets.
+4. Review the entire codebase for similar issues.

@@ -5,9 +5,9 @@ Purpose: git rules for commit message format, the pull request workflow, the fea
 ## Commit message format
 
 ```
-<type>: <description>
+<type>(<scope>): <description>
 
-<optional body>
+<body>
 ```
 
 Commit types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`.
@@ -24,10 +24,10 @@ When creating PRs:
 
 ## Feature implementation workflow
 
-1. Plan first: use the `planner` agent.
-2. TDD approach: use the `tdd-guide` agent.
-3. Code review: use the `code-reviewer` agent after writing code.
-4. Commit: follow the conventional commits format.
+1. Plan first
+2. TDD approach
+3. Code review after writing code.
+4. Commit.
 
 ## Branch naming
 
