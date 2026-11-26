@@ -147,6 +147,16 @@ describe("parseAuthorizationInput", () => {
     expect(parseAuthorizationInput(input)).toEqual({ code: undefined, state: "def", failure });
   });
 
+  it.each([
+    "https://claude.com/cai/oauth/authorize?code=true",
+    "https://claude.com/cai/oauth/authorize?code=tr",
+    "claude.com/cai/oauth/authorize?code=true&client_",
+  ])("rejects a partly copied sign-in link %s", (input) => {
+    expect(() => parseAuthorizationInput(input)).toThrow(
+      "That is the sign-in link. Paste the address you land on after signing in.",
+    );
+  });
+
   it("rejects the sign-in link itself", () => {
     const link = buildAuthorizeUrl({
       redirectUri: CLAUDE_COPY_CODE_REDIRECT_URI,
