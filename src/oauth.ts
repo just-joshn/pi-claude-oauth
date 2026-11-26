@@ -99,25 +99,30 @@ export function parseAuthorizationInput(input: string): {
   const value = input.trim();
   if (!value) return {};
 
-  const url = URL.parse(value);
-  if (url) {
+  const queryStart = value.indexOf("?");
+  if (queryStart !== -1 || value.includes("code=")) {
+    const [query = ""] = value.slice(queryStart + 1).split("#", 1);
+    const params = new URLSearchParams(query);
+    const error = params.get("error");
+    if (error) {
+      throw new ClaudeAuthError(
+        `Claude sign-in was declined: ${params.get("error_description") ?? error}`,
+      );
+    }
+    if (params.has("client_id")) {
+      throw new ClaudeAuthError(
+        "That is the sign-in link. Open it and sign in, then paste the address you land on after signing in, not the sign-in link.",
+      );
+    }
     return {
-      code: url.searchParams.get("code") ?? undefined,
-      state: url.searchParams.get("state") ?? undefined,
+      code: params.get("code") ?? undefined,
+      state: params.get("state") ?? undefined,
     };
   }
 
   if (value.includes("#")) {
     const [code, state] = value.split("#", 2);
     return { code: code || undefined, state: state || undefined };
-  }
-
-  if (value.includes("code=")) {
-    const params = new URLSearchParams(value);
-    return {
-      code: params.get("code") ?? undefined,
-      state: params.get("state") ?? undefined,
-    };
   }
 
   return { code: value };
@@ -182,6 +187,9 @@ function redact(serverText: string, sent: Record<string, string>): string {
 function describeFailure(status: number, payload: unknown, sent: Record<string, string>): string {
   const { code, description } = failureDetails(payload);
 
+  if (code === "invalid_grant" && sent["grant_type"] === "authorization_code") {
+    return "Claude rejected the authorization code (invalid_grant). It may have expired or already been used. Run `/login claude` to try again.";
+  }
   if (code === "invalid_grant") {
     return "Claude rejected the saved sign-in (invalid_grant). Run `/login claude` to sign in again.";
   }

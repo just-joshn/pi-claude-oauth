@@ -1,4 +1,4 @@
-import type { OAuthCredential, ProviderAuthInteraction } from "@earendil-works/pi-ai";
+import type { AuthPrompt, OAuthCredential, ProviderAuthInteraction } from "@earendil-works/pi-ai";
 
 import {
   DEFAULT_REDIRECT_URI,
@@ -39,13 +39,21 @@ function requireCode(input: string, expectedState: string): string {
   return parsed.code;
 }
 
+async function promptForPaste(
+  interaction: ProviderAuthInteraction,
+  prompt: AuthPrompt,
+): Promise<string> {
+  const pasted = await interaction.prompt(prompt);
+  return pasted.trim() ? pasted : promptForPaste(interaction, prompt);
+}
+
 async function readBrowserCode(
   interaction: ProviderAuthInteraction,
   server: LoopbackServer | undefined,
   placeholder: string,
 ): Promise<string> {
   const dismissPrompt = new AbortController();
-  const pasted = interaction.prompt({
+  const pasted = promptForPaste(interaction, {
     type: "manual_code",
     message:
       "Complete sign-in in the browser, or paste the authorization code or redirect URL here:",
@@ -117,7 +125,7 @@ async function loginWithCopyCode(
     instructions: "Complete sign-in, then copy the code Anthropic shows and paste it here.",
   });
 
-  const pasted = await interaction.prompt({
+  const pasted = await promptForPaste(interaction, {
     type: "manual_code",
     message: "Paste the code Anthropic shows after signing in:",
     placeholder: "code#state",

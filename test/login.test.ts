@@ -188,6 +188,11 @@ describe("login", () => {
     expect(calls[0]).toMatchObject({ code: "the-code" });
   });
 
+  it("rejects a pasted result without a code", async () => {
+    const { interaction: fake } = interaction("copy_code", ["/callback?scope=user"]);
+    await expect(login(fake)).rejects.toThrow(/No authorization code/);
+  });
+
   it("rejects a pasted sign-in link without contacting Claude", async () => {
     const link = buildAuthorizeUrl({
       redirectUri: CLAUDE_COPY_CODE_REDIRECT_URI,

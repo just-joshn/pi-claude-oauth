@@ -79,8 +79,8 @@ function replyTo(request: IncomingMessage, state: string): Reply {
 
   return {
     status: 200,
-    title: "Signed in",
-    message: "Claude is connected. You can close this tab and return to Pi.",
+    title: "Authorization received",
+    message: "Return to Pi to finish signing in. You can close this tab.",
     code,
   };
 }
