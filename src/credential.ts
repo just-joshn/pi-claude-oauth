@@ -19,9 +19,14 @@ export function toOAuthCredential(
   };
 }
 
+export function parseSetupToken(value: string | undefined): string | undefined {
+  const token = value?.trim();
+  return token?.startsWith(CLAUDE_TOKEN_PREFIX) ? token : undefined;
+}
+
 export function setupTokenCredential(token: string | undefined, now = Date.now()): OAuthCredential {
-  const access = token?.trim();
-  if (!access?.startsWith(CLAUDE_TOKEN_PREFIX)) {
+  const access = parseSetupToken(token);
+  if (!access) {
     throw new ClaudeAuthError(
       `Set ${CLAUDE_CODE_OAUTH_TOKEN_ENV} to a token from \`claude setup-token\` before starting Pi.`,
     );

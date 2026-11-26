@@ -9,7 +9,7 @@ The extension registers a native Pi provider, `claude`, that:
 - refreshes access tokens through Anthropic's token endpoint with Pi's locked, single-flight refresh path,
 - streams through Pi's built-in Anthropic Messages implementation, so message conversion, tool calls, prompt caching,
   usage accounting, thinking, cancellation, and retries behave exactly like the built-in `anthropic` provider,
-- reads `CLAUDE_CODE_OAUTH_TOKEN` when no credential is stored.
+- reads a `sk-ant-oat` setup token from `CLAUDE_CODE_OAUTH_TOKEN` when no credential is stored.
 
 ## Requirements
 
@@ -64,8 +64,9 @@ export a new one, restart Pi, and run `/login claude` again.
 - `/claude usage` shows the subscription's rolling usage windows with reset times.
 - `/claude login` and `/claude logout` point at the built-in `/login` and `/logout` commands.
 
-Model entries reuse Pi's generated Anthropic catalog, including context windows, output limits, thinking levels,
-compatibility flags, and per-token costs, so new Claude models appear as soon as Pi ships a catalog update.
+Model entries reuse the Anthropic catalog built into the installed Pi version, including context windows, output limits,
+thinking levels, compatibility flags, and per-token costs. New Claude models appear when you update Pi. Pi's live
+pi.dev catalog updates reach the built-in `anthropic` provider only, not this one.
 
 ## Billing and terms
 

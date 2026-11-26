@@ -5,6 +5,7 @@ import { anthropicMessagesApi } from "@earendil-works/pi-ai/compat";
 import {
   CLAUDE_CODE_OAUTH_TOKEN_ENV,
   isSetupTokenCredential,
+  parseSetupToken,
   setupTokenRefreshError,
   toOAuthCredential,
 } from "./credential.ts";
@@ -45,7 +46,7 @@ function claudeEnvToken(): ApiKeyAuth {
           source: "Pi credential",
         };
       }
-      const token = await ctx.env(CLAUDE_CODE_OAUTH_TOKEN_ENV);
+      const token = parseSetupToken(await ctx.env(CLAUDE_CODE_OAUTH_TOKEN_ENV));
       signal.throwIfAborted();
       return token ? { auth: { apiKey: token }, source: CLAUDE_CODE_OAUTH_TOKEN_ENV } : undefined;
     },
