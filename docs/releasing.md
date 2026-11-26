@@ -19,8 +19,10 @@ branch. No npm token is needed.
 
 ## Changelog
 
-Every pull request that changes what users get adds a line to `CHANGELOG.md`.
-Entries use this format:
+`CHANGELOG.md` is for people who install the package. Every pull request that
+changes what they get adds an entry. CI, tests, tooling and other changes that
+never reach the npm package stay out of it; their commits and this document
+record them. Entries use this format:
 
 ```markdown
 ## 0.2.0 (Unreleased)
@@ -53,8 +55,9 @@ REMOVED:
   have entries: `NEW FEATURES:`, `BREAKING CHANGES:`, `ADDED:`, `CHANGED:`
   and `REMOVED:`. A fix goes under `CHANGED:`, or under
   `BREAKING CHANGES:` when users must act.
-- Each entry is one full sentence on one line, written for the user: what
-  changed and what they now see or do.
+- Each entry covers one change, on one line, written for the user: what
+  changed and what they now see or do. Say what happened before when that
+  helps, comparing with the last release, not with unreleased work.
 
 CI fails unless `CHANGELOG.md` has a dated `## <version> (YYYY-MM-DD)` heading
 for the version in `package.json`, so a release cannot ship with an
