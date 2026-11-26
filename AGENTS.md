@@ -1,6 +1,8 @@
 # AGENTS.md
 
-## Rules
+This file lists the agent rule files for this repository. The rule files table gives each rule file's path and its purpose.
+
+## Rule files
 
 | Rule                                     | Purpose                                                              |
 | ---------------------------------------- | -------------------------------------------------------------------- |

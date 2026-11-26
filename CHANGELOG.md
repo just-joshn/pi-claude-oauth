@@ -1,5 +1,7 @@
 # Changelog
 
+This changelog is for people who install the package. It lists, for each version, the changes that reach them, one change per entry. CI, tests, tooling and other changes that never reach the npm package stay out of it.
+
 ## 0.1.5 (2026-11-26)
 
 NEW FEATURES:
