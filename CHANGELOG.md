@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.4] - 2026-11-26
+
+### Fixed
+
+- Pressing Enter on an empty paste prompt no longer ends sign-in or closes the local callback; Pi asks again.
+- Pasting the sign-in link itself is rejected with a clear message instead of sending `true` as the code.
+- Pasted redirects without a scheme, or as a path and query, are accepted, and a pasted denial reports its reason.
+- A rejected authorization code during login no longer claims the saved sign-in was rejected.
+- The browser callback page says the authorization was received instead of claiming Claude is connected before the
+  token exchange finishes.
+
 ## [0.1.3] - 2026-11-24
 
 ### Fixed

@@ -102,6 +102,36 @@ describe("parseAuthorizationInput", () => {
   it("returns nothing for empty input", () => {
     expect(parseAuthorizationInput("   ")).toEqual({});
   });
+
+  it.each([
+    "localhost:53692/callback?code=abc&state=def",
+    "platform.claude.com/oauth/code/callback?code=abc&state=def",
+    "/callback?code=abc&state=def",
+    "http://localhost:53692/callback?code=abc&state=def#fragment",
+  ])("reads the code and state from the pasted redirect %s", (input) => {
+    expect(parseAuthorizationInput(input)).toEqual({ code: "abc", state: "def" });
+  });
+
+  it.each([
+    [
+      "http://localhost:53692/callback?error=access_denied&error_description=User%20denied&state=def",
+      "Claude sign-in was declined: User denied",
+    ],
+    ["/callback?error=access_denied&state=def", "Claude sign-in was declined: access_denied"],
+  ])("reports a pasted denial %s", (input, message) => {
+    expect(() => parseAuthorizationInput(input)).toThrow(ClaudeAuthError);
+    expect(() => parseAuthorizationInput(input)).toThrow(message);
+  });
+
+  it("rejects the sign-in link itself", () => {
+    const link = buildAuthorizeUrl({
+      redirectUri: CLAUDE_COPY_CODE_REDIRECT_URI,
+      state: "def",
+      challenge: "challenge",
+    });
+    expect(() => parseAuthorizationInput(link)).toThrow(ClaudeAuthError);
+    expect(() => parseAuthorizationInput(link)).toThrow(/address you land on after signing in/);
+  });
 });
 
 describe("parseTokenPayload", () => {
@@ -175,13 +205,14 @@ describe("exchangeAuthorizationCode", () => {
     });
   });
 
-  it("explains an invalid_grant so the user knows to sign in again", async () => {
-    await expect(
-      exchangeAuthorizationCode(grant, {
-        signal: signal(),
-        fetch: async () => json({ error: "invalid_grant" }, 400),
-      }),
-    ).rejects.toThrow(/invalid_grant.*\/login claude/s);
+  it("explains a rejected authorization code so the user knows to try again", async () => {
+    const exchange = exchangeAuthorizationCode(grant, {
+      signal: signal(),
+      fetch: async () => json({ error: "invalid_grant" }, 400),
+    });
+    await expect(exchange).rejects.toThrow(
+      "Claude rejected the authorization code (invalid_grant). It may have expired or already been used. Run `/login claude` to try again.",
+    );
   });
 
   it("reports rate limiting", async () => {
@@ -268,6 +299,17 @@ describe("refreshAccessToken", () => {
           }),
       }),
     ).rejects.toThrow(/did not answer/);
+  });
+
+  it("explains a rejected refresh token so the user knows to sign in again", async () => {
+    await expect(
+      refreshAccessToken("refresh", {
+        signal: signal(),
+        fetch: async () => json({ error: "invalid_grant" }, 400),
+      }),
+    ).rejects.toThrow(
+      "Claude rejected the saved sign-in (invalid_grant). Run `/login claude` to sign in again.",
+    );
   });
 
   it("redacts submitted secrets that the server echoes in an error", async () => {

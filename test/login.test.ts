@@ -4,7 +4,12 @@ import type { AuthEvent, AuthPrompt, ProviderAuthInteraction } from "@earendil-w
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { login, type LoginDependencies } from "../src/login.ts";
-import { CLAUDE_AUTHORIZE_URL, CLAUDE_COPY_CODE_REDIRECT_URI } from "../src/oauth.ts";
+import {
+  buildAuthorizeUrl,
+  CLAUDE_AUTHORIZE_URL,
+  CLAUDE_COPY_CODE_REDIRECT_URI,
+  ClaudeAuthError,
+} from "../src/oauth.ts";
 
 function interaction(method: string, answers: string[] = []) {
   const events: AuthEvent[] = [];
@@ -167,9 +172,40 @@ describe("login", () => {
     await expect(login(fake)).rejects.toThrow(/different request/);
   });
 
-  it("rejects an empty copy-code result", async () => {
-    const { interaction: fake } = interaction("copy_code", ["   "]);
+  it("asks again after a blank copy-code paste", async () => {
+    const { interaction: fake, prompts } = interaction("copy_code", ["", "   ", "the-code"]);
+    const { calls, dependencies } = recordExchange();
+
+    await login(fake, dependencies);
+
+    expect(prompts.map((prompt) => prompt.type)).toEqual([
+      "select",
+      "manual_code",
+      "manual_code",
+      "manual_code",
+    ]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ code: "the-code" });
+  });
+
+  it("rejects a pasted result without a code", async () => {
+    const { interaction: fake } = interaction("copy_code", ["/callback?scope=user"]);
     await expect(login(fake)).rejects.toThrow(/No authorization code/);
+  });
+
+  it("rejects a pasted sign-in link without contacting Claude", async () => {
+    const link = buildAuthorizeUrl({
+      redirectUri: CLAUDE_COPY_CODE_REDIRECT_URI,
+      state: "state",
+      challenge: "challenge",
+    });
+    const { interaction: fake } = interaction("copy_code", [link]);
+    const { calls, dependencies } = recordExchange();
+
+    const attempt = login(fake, dependencies);
+    await expect(attempt).rejects.toThrow(ClaudeAuthError);
+    await expect(attempt).rejects.toThrow(/not the sign-in link/);
+    expect(calls).toHaveLength(0);
   });
 
   it("exchanges the code from the local browser callback", async () => {
@@ -193,6 +229,28 @@ describe("login", () => {
     expect(url.origin + url.pathname).toBe(CLAUDE_AUTHORIZE_URL);
     expect(url.searchParams.get("redirect_uri")).toBe(redirectUri);
     expect(url.searchParams.get("code")).toBe("true");
+  });
+
+  it("keeps waiting for the browser after a blank paste", async () => {
+    const { interaction: fake, prompts } = interaction("browser", [""]);
+    const { calls, dependencies } = recordExchange();
+    const close = vi.fn(() => {});
+
+    await login(fake, {
+      ...dependencies,
+      startServer: async () => ({
+        redirectUri: "http://localhost:1234/callback",
+        waitForCode: () =>
+          new Promise<string>((resolve) => setTimeout(resolve, 0, "callback-code")),
+        close,
+      }),
+    });
+
+    const pastePrompts = prompts.filter((prompt) => prompt.type === "manual_code");
+    expect(pastePrompts).toHaveLength(2);
+    expect(pastePrompts.at(-1)?.signal?.aborted).toBe(true);
+    expect(close).toHaveBeenCalled();
+    expect(calls[0]).toMatchObject({ code: "callback-code" });
   });
 
   it("releases the listener before exchanging a manually entered browser code", async () => {
