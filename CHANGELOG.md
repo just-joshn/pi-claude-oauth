@@ -1,13 +1,8 @@
 # Changelog
 
-This changelog is for people who install the package. It lists, for each version, the changes that reach them, one change per entry. CI, tests, tooling and other changes that never reach the npm package stay out of it.
+This changelog is for people who install the package. It lists, for each version, the changes that reach them, one change per entry. A version with no user-facing changes of its own has no sections; a short note under its heading says so. CI, tests, tooling and other changes that never reach the npm package stay out of it.
 
 ## 0.1.5 (2026-11-26)
-
-NEW FEATURES:
-
-- `/login claude` → **Sign in with an API key** accepts a pasted `claude setup-token` token and saves it. Before, it accepted nothing and said `CLAUDE_CODE_OAUTH_TOKEN` was configured outside Pi.
-- `/claude usage` shows per-model weekly limits, such as `7-day Fable`.
 
 BREAKING CHANGES:
 
@@ -15,10 +10,12 @@ BREAKING CHANGES:
 
 ADDED:
 
+- `/claude usage` shows per-model weekly limits, such as `7-day Fable`.
 - **Sign in with an API key** shows the same billing warning as the subscription sign-in.
 
 CHANGED:
 
+- `/login claude` → **Sign in with an API key** accepts a pasted `claude setup-token` token and saves it. Before, it accepted nothing and said `CLAUDE_CODE_OAUTH_TOKEN` was configured outside Pi.
 - A wrong paste during sign-in explains what is wrong and asks again. This covers the sign-in link or any piece of it, a result from another sign-in, and a result without a code. Before, sign-in ended and the browser callback closed.
 - Browser sign-in waits for the browser until sign-in ends. Before, it failed after 10 minutes.
 - Pasted results wrapped in `<>`, quotes or backticks, broken across lines, or holding only the query part are read correctly.
@@ -46,15 +43,11 @@ CHANGED:
 
 ## 0.1.3 (2026-11-24)
 
-CHANGED:
-
-- 0.1.1 and 0.1.2 never reached npm, so 0.1.3 is the first release with their changes.
+0.1.1 and 0.1.2 never reached npm, so 0.1.3 is the first release with their changes. 0.1.3 has no other user-facing changes.
 
 ## 0.1.2 (2026-11-24)
 
-CHANGED:
-
-- No change in behavior.
+No user-facing changes.
 
 ## 0.1.1 (2026-11-24)
 

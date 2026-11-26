@@ -28,7 +28,7 @@ Notes on the trusted publisher setup:
 - `CHANGELOG.md` is for package users, meaning people who install the package.
 - Every pull request that changes what package users get adds an entry to `CHANGELOG.md`.
 - CI, tests, tooling and other changes that never reach the npm package stay out of `CHANGELOG.md`.
-- Their commits and `docs/releasing.md` record those CI, test, tooling and other changes.
+- Their commits record those CI, test, tooling and other changes.
 
 ### Changelog entry format
 
@@ -79,6 +79,7 @@ REMOVED:
 
 ### Changelog entry rules
 
+- A version with no user-facing changes of its own has no sections. A short note under its heading says so, and may say why, such as earlier versions that never reached npm.
 - Each entry covers one change.
 - Each entry is on one line.
 - Each entry is written for package users: what changed and what they now see or do.
@@ -89,7 +90,7 @@ REMOVED:
 
 - CI fails unless `CHANGELOG.md` has a dated `## <version> (YYYY-MM-DD)` heading for the version in `package.json`.
 - Because of that check, a release cannot ship with an `(Unreleased)` heading.
-- CI also fails on any section other than `NEW FEATURES:`, `BREAKING CHANGES:`, `ADDED:`, `CHANGED:` and `REMOVED:`.
+- CI also fails on any section label that is not one of the five listed under "Changelog sections".
 
 ## Cut a release
 
@@ -97,12 +98,15 @@ REMOVED:
    - Increase `version` in `package.json` to an unused stable version.
    - Date the `CHANGELOG.md` heading for that version, for example by changing `## 0.2.0 (Unreleased)` to `## 0.2.0 (2026-12-01)`.
 2. After **CI** passes and the PR is approved, squash-merge the PR into `main`.
-3. The **Release** workflow runs CI on the merged commit.
-   - If neither npm nor a tag has the version, the **Release** workflow stages the version on npm from that commit, then creates the matching `vMAJOR.MINOR.PATCH` tag and GitHub release with generated notes.
-   - npm does not list a staged version until it is approved.
-   - Because npm does not list a staged version before approval, the tag is the record that the version was staged.
-   - Merges that leave the version unchanged run CI without releasing.
-   - Merges that come before the staged version is approved run CI without releasing.
+3. The **Release** workflow runs CI on the merged commit, then acts on the version in `package.json`:
+
+   | npm has the version | A `v<version>` tag exists | What the Release workflow does                                                                                                                    |
+   | ------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | No                  | No                        | Stages the version on npm from the merged commit, then creates the `v<version>` tag and a GitHub release with generated notes.                    |
+   | No                  | Yes                       | Nothing. The version is staged and waiting for approval. npm does not list a staged version until it is approved, so the tag records the staging. |
+   | Yes                 | No                        | Creates the `v<version>` tag and GitHub release at the commit npm recorded for the version. If npm recorded no commit, it creates neither.        |
+   | Yes                 | Yes                       | Nothing.                                                                                                                                          |
+
 4. Approve the staged version in one of these ways:
    - Approve it with 2FA on npmjs.com.
    - Run `npm stage list pi-claude-oauth` and `npm stage approve <stage-id>`.
@@ -118,8 +122,7 @@ If a release fails:
 
 Rules for reruns:
 
-- A rerun stages the version only if neither npm nor a tag has it.
-- A rerun never touches an existing tag.
+- A rerun follows the same table as step 3, so it never stages a version twice and never touches an existing tag.
 - If staging failed after the tag was created by hand, delete the tag and rerun.
 
 ## Workflow actions

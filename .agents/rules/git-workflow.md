@@ -10,7 +10,7 @@ Purpose: git rules for commit message format, the pull request workflow, the fea
 <body>
 ```
 
-Commit types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`.
+Commit types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`, `style`.
 
 ## Pull request workflow
 
@@ -31,9 +31,10 @@ When creating PRs:
 
 ## Branch naming
 
-| Prefix      | Use for               |
-| ----------- | --------------------- |
-| `feature/`  | New features          |
-| `fix/`      | Bug fixes             |
-| `refactor/` | Code refactoring      |
-| `docs/`     | Documentation changes |
+| Prefix      | Use for                         |
+| ----------- | ------------------------------- |
+| `feature/`  | New features                    |
+| `fix/`      | Bug fixes                       |
+| `refactor/` | Code refactoring                |
+| `docs/`     | Documentation changes           |
+| `ci/`       | CI and release workflow changes |

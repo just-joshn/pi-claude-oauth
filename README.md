@@ -1,6 +1,6 @@
 # pi-claude-oauth
 
-This README covers `pi-claude-oauth`, an extension that lets you use a Claude Pro, Max, or Ultra subscription from [Pi](https://github.com/earendil-works/pi) through Anthropic's OAuth tokens. It covers installing the extension, signing in, using the `claude` provider, billing, terms, security, and working on the source.
+`pi-claude-oauth` is an extension that lets you use a Claude Pro, Max, or Ultra subscription from [Pi](https://github.com/earendil-works/pi) through Anthropic's OAuth tokens. This README covers installing the extension, signing in, using the `claude` provider, billing, terms, security, and working on the source.
 
 ## The claude provider
 
@@ -9,14 +9,13 @@ The extension registers a native Pi provider named `claude`. The `claude` provid
 - Signs in with OAuth and PKCE.
 - Alternatively accepts a `claude setup-token` token.
 - Refreshes access tokens through Anthropic's token endpoint with Pi's locked, single-flight refresh path.
-- Streams through Pi's built-in Anthropic Messages implementation.
-- Because it streams through Pi's built-in Anthropic Messages implementation, message conversion, tool calls, prompt caching, usage accounting, thinking, cancellation, and retries behave exactly like the built-in `anthropic` provider.
+- Streams through Pi's built-in Anthropic Messages implementation, so message conversion, tool calls, prompt caching, usage accounting, thinking, cancellation, and retries behave exactly like the built-in `anthropic` provider.
 - Reads a `sk-ant-oat` setup token from `CLAUDE_CODE_OAUTH_TOKEN` when no credential is stored.
 
 ## Requirements
 
 - Pi 1.6.0 or newer.
-- A Claude Pro, Max, Ultra, Team, or Enterprise subscription with Claude Code access.
+- A Claude Pro, Max, or Ultra subscription with Claude Code access.
 
 ## Install the extension
 
@@ -59,6 +58,8 @@ Pi first asks how to sign in:
 | Copy code (headless)                | Uses Anthropic's manual redirect. Asks you to paste the `code#state` value that the manual redirect shows. Runs no local server.                                                                         |
 | Import setup token from environment | Saves the `claude setup-token` token from `CLAUDE_CODE_OAUTH_TOKEN`. Pi never asks you to type or paste the token.                                                                                       |
 
+**Sign in with an API key** is Pi's label for this option. For the `claude` provider, it takes a `claude setup-token` token, not an Anthropic API key. To use an Anthropic API key, use Pi's built-in `anthropic` provider.
+
 ### Choose a sign-in method
 
 Prefer the **Browser sign-in** method when you sign in interactively.
@@ -76,7 +77,7 @@ Pi uses the exported setup token directly. Alternatively, `/login claude` can sa
 ### Credential precedence and setup token expiry
 
 - When a credential is stored, the stored credential wins over the `CLAUDE_CODE_OAUTH_TOKEN` environment variable.
-- A setup token cannot be refreshed.
+- A setup token expires after a year and cannot be refreshed.
 - When a setup token expires, replace it in either of these ways:
   - Run `/login claude` and paste a new setup token with **Sign in with an API key**.
   - Export a new setup token, restart Pi, and import it with **Sign in with a Claude subscription** → **Import setup token from environment**.
@@ -105,8 +106,7 @@ Example commands:
 - Model entries reuse the Anthropic catalog built into the installed Pi version.
 - The reused catalog data includes context windows, output limits, thinking levels, compatibility flags, and per-token costs.
 - New Claude models appear when you update Pi.
-- Pi's live pi.dev catalog updates reach the built-in `anthropic` provider only.
-- Pi's live pi.dev catalog updates do not reach the `claude` provider.
+- Pi's live pi.dev catalog updates reach the built-in `anthropic` provider only, not the `claude` provider.
 
 ## Billing and terms
 
@@ -118,10 +118,8 @@ Example commands:
 
 ### Billing warning
 
-- Pi's built-in billing warning applies only to its `anthropic` provider.
-- Pi's built-in billing warning does not apply to this extension's `claude` provider.
-- The `/login claude` sign-in prompts show the equivalent warning instead.
-- The equivalent warning states that third-party harness usage is billed per token as extra usage, outside your Claude plan limits.
+- Pi's built-in billing warning applies only to its `anthropic` provider, not to this extension's `claude` provider.
+- The `/login claude` sign-in prompts show an equivalent warning instead. It states that third-party harness usage is billed per token as extra usage, outside your Claude plan limits.
 - Manage extra usage at https://claude.ai/settings/usage.
 
 ### Account-level use
@@ -146,14 +144,12 @@ Treat subscription OAuth as an account-level credential, not as a way to move pl
 
 ### Token refresh and Claude Code credentials
 
-- Refresh rotates the refresh token under Pi's credential-store lock.
-- Because refresh runs under Pi's credential-store lock, concurrent requests and concurrent Pi processes refresh once.
+- Refresh rotates the refresh token under Pi's credential-store lock, so concurrent requests and concurrent Pi processes refresh once.
 - The extension deliberately does not import the refresh token from Claude Code's own credential store. Anthropic rotates refresh tokens, so copying Claude Code's refresh token and refreshing it in this extension would invalidate your Claude Code login.
 
 ### OAuth client id
 
-- The OAuth client id is Claude Code's public PKCE client id.
-- The OAuth client id is not a secret.
+- The OAuth client id is Claude Code's public PKCE client id, so it is not a secret.
 
 ## Protocol reference
 
@@ -199,13 +195,12 @@ bun run test:coverage  # 80% minimum statement/branch/function/line coverage per
 bun run format         # apply formatting; use bun run format:check to check only
 bun run lint           # type-aware Oxlint
 bun run typecheck      # tsc --noEmit
-bun run check          # all of the checks above, as CI runs them
+bun run check          # format:check, lint, typecheck and test:coverage
+node scripts/smoke.ts  # smoke test on real Pi; uses $PI_BIN, or pi on your PATH
 pi -e .                # load this checkout in Pi
 ```
 
 ### Source layout
-
-Layout:
 
 ```
 src/
@@ -227,4 +222,3 @@ src/
 - If Claude Code changes endpoints, scopes, or headers, the constants in `oauth.ts` need the same change.
 - Usage windows come from Claude's internal usage endpoint.
 - When Claude's internal usage endpoint is unavailable, `/claude usage` reports the HTTP status instead of guessing.
-- A setup token expires after a year and cannot be refreshed.
