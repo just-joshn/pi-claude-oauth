@@ -109,7 +109,7 @@ const CLOSING_WRAPPERS: Readonly<Record<string, string>> = {
 function unwrap(value: string): string {
   const close = CLOSING_WRAPPERS[value.charAt(0)];
   if (close && value.length > 1 && value.endsWith(close)) {
-    return value.slice(1, -1).trim();
+    return value.slice(1, -1);
   }
   return value;
 }
@@ -133,11 +133,11 @@ export function parseAuthorizationInput(input: string): {
   state?: string | undefined;
   failure?: string | undefined;
 } {
-  const value = unwrap(input.trim());
+  const value = unwrap(input.replace(/\s+/g, ""));
   if (!value) return {};
 
   const queryStart = value.indexOf("?");
-  if (queryStart !== -1 || value.includes("code=")) {
+  if (queryStart !== -1 || /(^|&)(code|error)=/.test(value)) {
     const [query = ""] = value.slice(queryStart + 1).split("#", 1);
     const params = new URLSearchParams(query);
     if (params.has("client_id") || value.slice(0, queryStart).endsWith(AUTHORIZE_PATH)) {
