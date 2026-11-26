@@ -126,6 +126,12 @@ describe("formatResetTime", () => {
     expect(formatResetTime("2030-01-01T12:00:00Z")).toBeTruthy();
   });
 
+  it("tells apart resets a week apart at the same clock time", () => {
+    expect(formatResetTime("2030-01-03T12:00:00Z")).not.toBe(
+      formatResetTime("2030-01-10T12:00:00Z"),
+    );
+  });
+
   it("rejects an invalid timestamp", () => {
     expect(formatResetTime("not-a-date")).toBeUndefined();
   });
