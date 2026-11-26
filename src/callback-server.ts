@@ -1,12 +1,11 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 
-import { ClaudeAuthError } from "./oauth.ts";
+import { authorizationFailure, ClaudeAuthError } from "./oauth.ts";
 
 const PREFERRED_PORT = 53692;
 const DEFAULT_PORTS = [PREFERRED_PORT, 0] as const;
 const LOOPBACK_HOSTS = ["127.0.0.1", "::1"] as const;
 const CALLBACK_PATH = "/callback";
-const DEFAULT_TIMEOUT_MS = 10 * 60_000;
 const NOT_THE_REDIRECT = "This local address only accepts the Claude sign-in redirect.";
 
 const redirectUriFor = (port: number): string => `http://localhost:${port}${CALLBACK_PATH}`;
@@ -17,7 +16,6 @@ interface LoopbackServerOptions {
   readonly state: string;
   readonly signal?: AbortSignal;
   readonly ports?: readonly number[];
-  readonly timeoutMs?: number;
 }
 
 export interface LoopbackServer {
@@ -56,14 +54,13 @@ function replyTo(request: IncomingMessage, state: string): Reply {
     };
   }
 
-  const error = url.searchParams.get("error");
-  if (error) {
-    const description = url.searchParams.get("error_description") || error;
+  const failure = authorizationFailure(url.searchParams);
+  if (failure) {
     return {
       status: 400,
-      title: "Sign-in declined",
-      message: description,
-      failure: `Claude sign-in was declined: ${description}`,
+      title: failure.title,
+      message: failure.detail,
+      failure: failure.message,
     };
   }
 
@@ -148,7 +145,6 @@ export async function startLoopbackServer(options: LoopbackServerOptions): Promi
   const { promise, resolve, reject } = Promise.withResolvers<string>();
 
   const close = () => {
-    clearTimeout(timer);
     options.signal?.removeEventListener("abort", onAbort);
     closeListeners(servers);
   };
@@ -157,8 +153,6 @@ export async function startLoopbackServer(options: LoopbackServerOptions): Promi
     reject(new ClaudeAuthError(message));
   };
   const onAbort = () => fail("Claude sign-in was cancelled.");
-  const timer = setTimeout(close, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-  timer.unref();
   options.signal?.addEventListener("abort", onAbort, { once: true });
 
   const handleRequest = (request: IncomingMessage, response: ServerResponse) => {

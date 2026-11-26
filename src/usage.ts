@@ -1,4 +1,3 @@
-import { CLAUDE_CODE_OAUTH_TOKEN_ENV } from "./credential.ts";
 import { CLAUDE_PROVIDER_ID } from "./models.ts";
 import {
   CLAUDE_OAUTH_BETA,
@@ -123,7 +122,7 @@ export async function fetchUsage(
 
   if (status === 401 || status === 403) {
     throw new ClaudeAuthError(
-      `Claude rejected this token for usage lookup (HTTP ${status}). Sign in again with /login ${CLAUDE_PROVIDER_ID} or replace ${CLAUDE_CODE_OAUTH_TOKEN_ENV}.`,
+      `Claude rejected this token for usage lookup (HTTP ${status}). Run /login ${CLAUDE_PROVIDER_ID} to sign in again or paste a new setup token.`,
     );
   }
   if (!ok) {

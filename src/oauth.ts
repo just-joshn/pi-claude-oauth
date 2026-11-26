@@ -113,10 +113,24 @@ function unwrap(value: string): string {
   return value;
 }
 
+export function authorizationFailure(
+  params: URLSearchParams,
+): { title: string; detail: string; message: string } | undefined {
+  const error = params.get("error");
+  if (!error) {
+    return undefined;
+  }
+  const detail = params.get("error_description") || error;
+  if (error === "access_denied") {
+    return { title: "Sign-in declined", detail, message: `Claude sign-in was declined: ${detail}` };
+  }
+  return { title: "Sign-in failed", detail, message: `Claude sign-in failed: ${detail}` };
+}
+
 export function parseAuthorizationInput(input: string): {
   code?: string | undefined;
   state?: string | undefined;
-  denial?: string | undefined;
+  failure?: string | undefined;
 } {
   const value = unwrap(input.trim());
   if (!value) return {};
@@ -125,7 +139,6 @@ export function parseAuthorizationInput(input: string): {
   if (queryStart !== -1 || value.includes("code=")) {
     const [query = ""] = value.slice(queryStart + 1).split("#", 1);
     const params = new URLSearchParams(query);
-    const error = params.get("error") || undefined;
     if (params.has("client_id")) {
       throw new InvalidPasteError(
         "That is the sign-in link. Paste the address you land on after signing in.",
@@ -134,7 +147,7 @@ export function parseAuthorizationInput(input: string): {
     return {
       code: params.get("code") ?? undefined,
       state: params.get("state") ?? undefined,
-      denial: error && (params.get("error_description") || error),
+      failure: authorizationFailure(params)?.message,
     };
   }
 
