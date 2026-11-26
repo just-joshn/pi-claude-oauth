@@ -155,6 +155,8 @@ describe("parseAuthorizationInput", () => {
     "https://claude.ai/oauth/authorize?code=true&client_",
     "https://claude.com/cai/oauth \n /authorize?code=true",
     " https://claude.com/cai/oauth \n /authorize?code=true&client_ ",
+    "ode=true&client_id=9d1c250a-e61b-44d9-88ed-5944d1962f5e&resp",
+    "ed-5944d1962f5e&response_type=code&redirect_uri=https%3A%2F%",
   ])("rejects a partly copied sign-in link %s", (input) => {
     expect(() => parseAuthorizationInput(input)).toThrow(
       "That is the sign-in link. Paste the address you land on after signing in.",
