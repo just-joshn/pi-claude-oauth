@@ -78,6 +78,31 @@ describe("createAuthorizationSession", () => {
 });
 
 describe("parseAuthorizationInput", () => {
+  const signInLink = buildAuthorizeUrl({
+    redirectUri: CLAUDE_COPY_CODE_REDIRECT_URI,
+    state: "Inhxz90bfKf88trinuNTh1G9RVnHKZxhYcd6FSx40G0",
+    challenge: "b5-JsMYhCmV6uO0SUHskQmW3pZ8vT2nA7cD9eF1gH4j",
+  });
+
+  it.each(["Ab3_xY9=", "Ab3=xY9", "Ab3xY9="])("reads the bare code %s", (input) => {
+    expect(parseAuthorizationInput(input, signInLink)).toEqual({ code: input });
+  });
+
+  it.each([
+    signInLink.slice(signInLink.indexOf("/authorize"), signInLink.indexOf("client_id") + 7),
+    signInLink.slice(signInLink.indexOf("code_challenge=") - 20, signInLink.indexOf("&state")),
+    signInLink.slice(signInLink.indexOf("ode=true"), signInLink.indexOf("response_type") + 4),
+    signInLink.slice(
+      signInLink.indexOf("&response_type") - 15,
+      signInLink.indexOf("redirect_uri") + 20,
+    ),
+    signInLink.slice(signInLink.indexOf("state=") + 6),
+  ])("rejects the fragment %s of the sign-in link shown for this login", (input) => {
+    expect(() => parseAuthorizationInput(` ${input} `, signInLink)).toThrow(
+      "That is the sign-in link. Paste the address you land on after signing in.",
+    );
+  });
+
   it("reads a full redirect URL", () => {
     expect(
       parseAuthorizationInput("https://platform.claude.com/oauth/code/callback?code=abc&state=def"),
@@ -104,6 +129,23 @@ describe("parseAuthorizationInput", () => {
   });
 
   it.each([
+    ["<", ">"],
+    ['"', '"'],
+    ["'", "'"],
+    ["`", "`"],
+  ])("reads a redirect URL wrapped in %s%s", (open, close) => {
+    expect(
+      parseAuthorizationInput(
+        ` ${open}https://platform.claude.com/oauth/code/callback?code=abc&state=def${close} `,
+      ),
+    ).toEqual({ code: "abc", state: "def" });
+  });
+
+  it("reads a quoted code#state", () => {
+    expect(parseAuthorizationInput('"abc#def"')).toEqual({ code: "abc", state: "def" });
+  });
+
+  it.each([
     "localhost:53692/callback?code=abc&state=def",
     "platform.claude.com/oauth/code/callback?code=abc&state=def",
     "/callback?code=abc&state=def",
@@ -118,9 +160,30 @@ describe("parseAuthorizationInput", () => {
       "Claude sign-in was declined: User denied",
     ],
     ["/callback?error=access_denied&state=def", "Claude sign-in was declined: access_denied"],
-  ])("reports a pasted denial %s", (input, message) => {
-    expect(() => parseAuthorizationInput(input)).toThrow(ClaudeAuthError);
-    expect(() => parseAuthorizationInput(input)).toThrow(message);
+    [
+      "/callback?error=access_denied&error_description=&state=def",
+      "Claude sign-in was declined: access_denied",
+    ],
+    [
+      "/callback?error=temporarily_unavailable&state=def",
+      "Claude sign-in failed: temporarily_unavailable",
+    ],
+    ["error=access_denied&state=def", "Claude sign-in was declined: access_denied"],
+  ])("reads a pasted error %s with its state", (input, failure) => {
+    expect(parseAuthorizationInput(input)).toEqual({ code: undefined, state: "def", failure });
+  });
+
+  it.each([
+    "https://claude.com/cai/oauth/authorize?code=true",
+    "https://claude.com/cai/oauth/authorize?code=tr",
+    "claude.com/cai/oauth/authorize?code=true&client_",
+    "https://claude.ai/oauth/authorize?code=true&client_",
+    "https://claude.com/cai/oauth \n /authorize?code=true",
+    " https://claude.com/cai/oauth \n /authorize?code=true&client_ ",
+  ])("rejects a partly copied sign-in link %s", (input) => {
+    expect(() => parseAuthorizationInput(input)).toThrow(
+      "That is the sign-in link. Paste the address you land on after signing in.",
+    );
   });
 
   it("rejects the sign-in link itself", () => {
@@ -130,7 +193,9 @@ describe("parseAuthorizationInput", () => {
       challenge: "challenge",
     });
     expect(() => parseAuthorizationInput(link)).toThrow(ClaudeAuthError);
-    expect(() => parseAuthorizationInput(link)).toThrow(/address you land on after signing in/);
+    expect(() => parseAuthorizationInput(link)).toThrow(
+      "That is the sign-in link. Paste the address you land on after signing in.",
+    );
   });
 });
 

@@ -10,11 +10,11 @@ export const CLAUDE_SCOPES = [
   "user:sessions:claude_code",
 ] as const;
 
-/** Beta flag the Messages API requires for OAuth access tokens. */
 export const CLAUDE_OAUTH_BETA = "oauth-2025-04-20";
 
 export const CLAUDE_TOKEN_PREFIX = "sk-ant-oat";
 
+const AUTHORIZE_PATH = "/oauth/authorize";
 const TOKEN_TIMEOUT_MS = 30_000;
 const DEFAULT_TOKEN_LIFETIME_SECONDS = 3_600;
 
@@ -24,6 +24,13 @@ export class ClaudeAuthError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
     super(message, options);
     this.name = "ClaudeAuthError";
+  }
+}
+
+export class InvalidPasteError extends ClaudeAuthError {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidPasteError";
   }
 }
 
@@ -92,31 +99,63 @@ export function buildAuthorizeUrl(options: AuthorizeUrlOptions): string {
   return `${CLAUDE_AUTHORIZE_URL}?${params.toString()}`;
 }
 
-export function parseAuthorizationInput(input: string): {
+const CLOSING_WRAPPERS: Readonly<Record<string, string>> = {
+  "<": ">",
+  '"': '"',
+  "'": "'",
+  "`": "`",
+};
+
+function unwrap(value: string): string {
+  const close = CLOSING_WRAPPERS[value.charAt(0)];
+  if (close && value.length > 1 && value.endsWith(close)) {
+    return value.slice(1, -1);
+  }
+  return value;
+}
+
+export function authorizationFailure(
+  params: URLSearchParams,
+): { title: string; detail: string; message: string } | undefined {
+  const error = params.get("error");
+  if (!error) {
+    return undefined;
+  }
+  const detail = params.get("error_description") || error;
+  if (error === "access_denied") {
+    return { title: "Sign-in declined", detail, message: `Claude sign-in was declined: ${detail}` };
+  }
+  return { title: "Sign-in failed", detail, message: `Claude sign-in failed: ${detail}` };
+}
+
+const SIGN_IN_LINK_PASTED =
+  "That is the sign-in link. Paste the address you land on after signing in.";
+
+export function parseAuthorizationInput(
+  input: string,
+  signInLink?: string,
+): {
   code?: string | undefined;
   state?: string | undefined;
+  failure?: string | undefined;
 } {
-  const value = input.trim();
+  const value = unwrap(input.replace(/\s+/g, ""));
   if (!value) return {};
+  if (signInLink?.includes(value)) {
+    throw new InvalidPasteError(SIGN_IN_LINK_PASTED);
+  }
 
   const queryStart = value.indexOf("?");
-  if (queryStart !== -1 || value.includes("code=")) {
+  if (queryStart !== -1 || /(^|&)(code|error)=/.test(value)) {
     const [query = ""] = value.slice(queryStart + 1).split("#", 1);
     const params = new URLSearchParams(query);
-    const error = params.get("error");
-    if (error) {
-      throw new ClaudeAuthError(
-        `Claude sign-in was declined: ${params.get("error_description") ?? error}`,
-      );
-    }
-    if (params.has("client_id")) {
-      throw new ClaudeAuthError(
-        "That is the sign-in link. Open it and sign in, then paste the address you land on after signing in, not the sign-in link.",
-      );
+    if (params.has("client_id") || value.slice(0, queryStart).endsWith(AUTHORIZE_PATH)) {
+      throw new InvalidPasteError(SIGN_IN_LINK_PASTED);
     }
     return {
       code: params.get("code") ?? undefined,
       state: params.get("state") ?? undefined,
+      failure: authorizationFailure(params)?.message,
     };
   }
 
@@ -187,11 +226,10 @@ function redact(serverText: string, sent: Record<string, string>): string {
 function describeFailure(status: number, payload: unknown, sent: Record<string, string>): string {
   const { code, description } = failureDetails(payload);
 
-  if (code === "invalid_grant" && sent["grant_type"] === "authorization_code") {
-    return "Claude rejected the authorization code (invalid_grant). It may have expired or already been used. Run `/login claude` to try again.";
-  }
   if (code === "invalid_grant") {
-    return "Claude rejected the saved sign-in (invalid_grant). Run `/login claude` to sign in again.";
+    return sent["grant_type"] === "authorization_code"
+      ? "Claude rejected the authorization code (invalid_grant). It may have expired or already been used. Run `/login claude` to try again."
+      : "Claude rejected the saved sign-in (invalid_grant). Run `/login claude` to sign in again.";
   }
   if (status === 429) {
     return "Claude is rate limiting sign-in (HTTP 429). Wait a moment and try again.";

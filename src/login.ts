@@ -18,48 +18,75 @@ import {
   createAuthorizationSession,
   exchangeAuthorizationCode,
   type FetchLike,
+  InvalidPasteError,
   parseAuthorizationInput,
 } from "./oauth.ts";
+
+export const BILLING_WARNING =
+  "Third-party harness usage is billed per token as extra usage, outside your plan limits.";
 
 export interface LoginDependencies {
   readonly fetch?: FetchLike;
   readonly startServer?: typeof startLoopbackServer;
 }
 
-function requireCode(input: string, expectedState: string): string {
-  const parsed = parseAuthorizationInput(input);
-  if (parsed.state !== undefined && parsed.state !== expectedState) {
-    throw new ClaudeAuthError(
-      "The pasted sign-in result belongs to a different request. Start the login again.",
-    );
+interface PendingSignIn {
+  readonly state: string;
+  readonly signInLink: string;
+}
+
+function requireCode(input: string, pending: PendingSignIn): string {
+  const parsed = parseAuthorizationInput(input, pending.signInLink);
+  if (parsed.state !== undefined && parsed.state !== pending.state) {
+    throw new InvalidPasteError("The pasted sign-in result belongs to a different request.");
+  }
+  if (parsed.failure) {
+    throw new ClaudeAuthError(parsed.failure);
   }
   if (!parsed.code) {
-    throw new ClaudeAuthError("No authorization code was found in that sign-in result.");
+    throw new InvalidPasteError("No authorization code was found in that sign-in result.");
   }
   return parsed.code;
 }
 
-async function promptForPaste(
+async function promptForCode(
   interaction: ProviderAuthInteraction,
   prompt: AuthPrompt,
+  pending: PendingSignIn,
 ): Promise<string> {
   const pasted = await interaction.prompt(prompt);
-  return pasted.trim() ? pasted : promptForPaste(interaction, prompt);
+  if (!pasted.trim()) {
+    return promptForCode(interaction, prompt, pending);
+  }
+  try {
+    return requireCode(pasted, pending);
+  } catch (error) {
+    if (!(error instanceof InvalidPasteError)) {
+      throw error;
+    }
+    interaction.notify({ type: "info", message: error.message });
+    return promptForCode(interaction, prompt, pending);
+  }
 }
 
 async function readBrowserCode(
   interaction: ProviderAuthInteraction,
   server: LoopbackServer | undefined,
   placeholder: string,
+  pending: PendingSignIn,
 ): Promise<string> {
   const dismissPrompt = new AbortController();
-  const pasted = promptForPaste(interaction, {
-    type: "manual_code",
-    message:
-      "Complete sign-in in the browser, or paste the authorization code or redirect URL here:",
-    placeholder,
-    signal: AbortSignal.any([interaction.signal, dismissPrompt.signal]),
-  });
+  const pasted = promptForCode(
+    interaction,
+    {
+      type: "manual_code",
+      message:
+        "Complete sign-in in the browser, or paste the authorization code or redirect URL here:",
+      placeholder,
+      signal: AbortSignal.any([interaction.signal, dismissPrompt.signal]),
+    },
+    pending,
+  );
   if (!server) return pasted;
 
   try {
@@ -97,15 +124,15 @@ async function loginWithBrowser(
   let code: string;
   try {
     if (interaction.signal.aborted) throw new ClaudeAuthError("Claude sign-in was cancelled.");
+    const signInLink = buildAuthorizeUrl({ redirectUri, state, challenge });
     interaction.notify({
       type: "auth_url",
-      url: buildAuthorizeUrl({ redirectUri, state, challenge }),
+      url: signInLink,
       instructions:
         "Complete sign-in in your browser. If the browser runs on another machine, paste the final redirect URL here.",
     });
 
-    const raw = await readBrowserCode(interaction, server, redirectUri);
-    code = requireCode(raw, state);
+    code = await readBrowserCode(interaction, server, redirectUri, { state, signInLink });
   } finally {
     server?.close();
   }
@@ -118,20 +145,24 @@ async function loginWithCopyCode(
 ): Promise<OAuthCredential> {
   const { state, verifier, challenge } = await createAuthorizationSession();
   const redirectUri = CLAUDE_COPY_CODE_REDIRECT_URI;
+  const signInLink = buildAuthorizeUrl({ redirectUri, state, challenge });
 
   interaction.notify({
     type: "auth_url",
-    url: buildAuthorizeUrl({ redirectUri, state, challenge }),
+    url: signInLink,
     instructions: "Complete sign-in, then copy the code Anthropic shows and paste it here.",
   });
 
-  const pasted = await promptForPaste(interaction, {
-    type: "manual_code",
-    message: "Paste the code Anthropic shows after signing in:",
-    placeholder: "code#state",
-    signal: interaction.signal,
-  });
-  const code = requireCode(pasted, state);
+  const code = await promptForCode(
+    interaction,
+    {
+      type: "manual_code",
+      message: "Paste the code Anthropic shows after signing in:",
+      placeholder: "code#state",
+      signal: interaction.signal,
+    },
+    { state, signInLink },
+  );
   return exchangeCode(interaction, dependencies, { code, state, verifier, redirectUri });
 }
 
@@ -141,8 +172,7 @@ export async function login(
 ): Promise<OAuthCredential> {
   const method = await interaction.prompt({
     type: "select",
-    message:
-      "Sign in to Claude. Third-party harness usage is billed per token as extra usage, outside your plan limits.",
+    message: `Sign in to Claude. ${BILLING_WARNING}`,
     options: [
       {
         id: "browser",

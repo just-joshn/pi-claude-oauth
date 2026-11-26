@@ -2,6 +2,7 @@ import type { ProviderAuthInteraction } from "@earendil-works/pi-ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CLAUDE_CODE_OAUTH_TOKEN_ENV } from "../src/credential.ts";
+import { ClaudeAuthError } from "../src/oauth.ts";
 import { claudeProvider } from "../src/provider.ts";
 
 const signal = () => new AbortController().signal;
@@ -39,6 +40,35 @@ describe("claudeProvider", () => {
       source: CLAUDE_CODE_OAUTH_TOKEN_ENV,
     });
   });
+
+  it("trims whitespace around the environment token", async () => {
+    const resolved = await claudeProvider().auth.apiKey?.resolve({
+      ctx: authContext(" sk-ant-oat01-token\r\n"),
+      signal: signal(),
+    });
+    expect(resolved).toEqual({
+      auth: { apiKey: "sk-ant-oat01-token" },
+      source: CLAUDE_CODE_OAUTH_TOKEN_ENV,
+    });
+  });
+
+  it.each([
+    "sk-ant-api03-key",
+    '"sk-ant-oat01-token"',
+    "hunter2",
+    "  ",
+    "sk-ant-oat01-AAAA\nBBBB",
+    "sk-ant-oat01-AAAABBBB\u201d",
+  ])(
+    "leaves the provider unconfigured for the non-setup-token environment value %j",
+    async (value) => {
+      const resolved = await claudeProvider().auth.apiKey?.resolve({
+        ctx: authContext(value),
+        signal: signal(),
+      });
+      expect(resolved).toBeUndefined();
+    },
+  );
 
   it.each([undefined, "ambient-fixture"])(
     "uses Pi's supplied key before the environment (%s)",
@@ -122,6 +152,37 @@ describe("claudeProvider", () => {
     expect(resolved).toBeUndefined();
   });
 
+  it("saves a pasted setup token from the API-key sign-in and resolves it", async () => {
+    const prompt = vi.fn<ProviderAuthInteraction["prompt"]>(async () => " sk-ant-oat01-pasted\n");
+    const apiKey = claudeProvider().auth.apiKey;
+
+    const credential = await apiKey?.login?.({ signal: signal(), prompt, notify: () => {} });
+
+    expect(prompt).toHaveBeenCalledOnce();
+    expect(prompt.mock.calls[0]?.[0].type).toBe("secret");
+    expect(prompt.mock.calls[0]?.[0].message).toContain("billed per token as extra usage");
+    expect(credential).toStrictEqual({ type: "api_key", key: "sk-ant-oat01-pasted" });
+    const resolved = await apiKey?.resolve({
+      ctx: authContext(undefined),
+      ...(credential && { credential }),
+      signal: signal(),
+    });
+    expect(resolved?.auth.apiKey).toBe("sk-ant-oat01-pasted");
+  });
+
+  it.each(["", "sk-ant-api03-AAAA", '"sk-ant-oat01-AAAA"', "sk-ant-oat01-AAAA\nBBBB"])(
+    "refuses to save the pasted non-setup-token %j without echoing it",
+    async (pasted) => {
+      const attempt = claudeProvider().auth.apiKey?.login?.({
+        signal: signal(),
+        prompt: async () => pasted,
+        notify: () => {},
+      });
+      await expect(attempt).rejects.toThrow(ClaudeAuthError);
+      await expect(attempt).rejects.not.toThrow(/AAAA/);
+    },
+  );
+
   it("signs in through the Claude login flow", async () => {
     vi.stubEnv(CLAUDE_CODE_OAUTH_TOKEN_ENV, "sk-ant-oat01-env-fixture");
     const prompt = vi.fn<ProviderAuthInteraction["prompt"]>(async () => "setup_token");
@@ -148,6 +209,38 @@ describe("claudeProvider", () => {
       expires: Date.now() + 1,
     });
     expect(auth).toEqual({ apiKey: "sk-ant-oat01-token" });
+  });
+
+  it("sends a saved setup token without surrounding whitespace", async () => {
+    const auth = await claudeProvider().auth.oauth?.toAuth({
+      type: "oauth",
+      access: "sk-ant-oat01-token\n",
+      refresh: "",
+      expires: Date.now() + 1_000_000,
+    });
+    expect(auth).toEqual({ apiKey: "sk-ant-oat01-token" });
+  });
+
+  it("refuses to send a saved setup token that is malformed, without echoing it", async () => {
+    const auth = claudeProvider().auth.oauth?.toAuth({
+      type: "oauth",
+      access: "sk-ant-oat01-SECRET\nPART2",
+      refresh: "",
+      expires: Date.now() + 1_000_000,
+    });
+    await expect(auth).rejects.toThrow(ClaudeAuthError);
+    await expect(auth).rejects.toThrow(/\/login claude/);
+    await expect(auth).rejects.not.toThrow(/SECRET/);
+  });
+
+  it("hands a refreshable OAuth access token to Pi without the setup-token format check", async () => {
+    const auth = await claudeProvider().auth.oauth?.toAuth({
+      type: "oauth",
+      access: "opaque.access-token",
+      refresh: "r",
+      expires: Date.now() + 1,
+    });
+    expect(auth).toEqual({ apiKey: "opaque.access-token" });
   });
 
   it("refreshes a rotating Claude OAuth credential", async () => {

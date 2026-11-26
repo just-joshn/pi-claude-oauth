@@ -9,7 +9,7 @@ The extension registers a native Pi provider, `claude`, that:
 - refreshes access tokens through Anthropic's token endpoint with Pi's locked, single-flight refresh path,
 - streams through Pi's built-in Anthropic Messages implementation, so message conversion, tool calls, prompt caching,
   usage accounting, thinking, cancellation, and retries behave exactly like the built-in `anthropic` provider,
-- reads `CLAUDE_CODE_OAUTH_TOKEN` when no credential is stored.
+- reads a `sk-ant-oat` setup token from `CLAUDE_CODE_OAUTH_TOKEN` when no credential is stored.
 
 ## Requirements
 
@@ -34,13 +34,14 @@ pi -e npm:pi-claude-oauth
 /login claude
 ```
 
-Three methods are offered:
+Pi first asks how to sign in. **Sign in with an API key** asks you to paste a `claude setup-token` token and saves it
+in Pi. **Sign in with a Claude subscription** offers three methods:
 
-| Method                              | What it does                                                                                                                                                    |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Browser sign-in                     | Authorizes in your browser and returns through `http://localhost:53692/callback`. If the browser runs on another machine, paste the final redirect URL instead. |
-| Copy code (headless)                | Uses Anthropic's manual redirect and asks you to paste the `code#state` value it shows. No local server.                                                        |
-| Import setup token from environment | Saves the `claude setup-token` token from `CLAUDE_CODE_OAUTH_TOKEN`. Pi never asks you to type or paste it.                                                     |
+| Method                              | What it does                                                                                                                                                                                        |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Browser sign-in                     | Authorizes in your browser and returns through `http://localhost:53692/callback`, or a free port when 53692 is taken. If the browser runs on another machine, paste the final redirect URL instead. |
+| Copy code (headless)                | Uses Anthropic's manual redirect and asks you to paste the `code#state` value it shows. No local server.                                                                                            |
+| Import setup token from environment | Saves the `claude setup-token` token from `CLAUDE_CODE_OAUTH_TOKEN`. Pi never asks you to type or paste it.                                                                                         |
 
 Prefer the browser flow interactively. For containers, CI, or any environment without a browser, export a setup token
 before starting Pi. Pi uses it directly, or `/login claude` can save it:
@@ -50,7 +51,8 @@ export CLAUDE_CODE_OAUTH_TOKEN="$(claude setup-token)"
 ```
 
 When a credential is stored, it wins over the environment variable. A setup token cannot be refreshed: when it expires,
-export a new one, restart Pi, and run `/login claude` again.
+run `/login claude` and paste a new one with **Sign in with an API key**, or export it, restart Pi, and import it with
+**Sign in with a Claude subscription** → **Import setup token from environment**.
 
 ## Use it
 
@@ -64,8 +66,9 @@ export a new one, restart Pi, and run `/login claude` again.
 - `/claude usage` shows the subscription's rolling usage windows with reset times.
 - `/claude login` and `/claude logout` point at the built-in `/login` and `/logout` commands.
 
-Model entries reuse Pi's generated Anthropic catalog, including context windows, output limits, thinking levels,
-compatibility flags, and per-token costs, so new Claude models appear as soon as Pi ships a catalog update.
+Model entries reuse the Anthropic catalog built into the installed Pi version, including context windows, output limits,
+thinking levels, compatibility flags, and per-token costs. New Claude models appear when you update Pi. Pi's live
+pi.dev catalog updates reach the built-in `anthropic` provider only, not this one.
 
 ## Billing and terms
 
@@ -73,7 +76,7 @@ This extension does not bypass anything. It performs the same OAuth client, scop
 uses, and it sends the tokens to Anthropic's API.
 
 Pi's built-in billing warning applies only to its `anthropic` provider, not this extension's `claude` provider. The
-`/login claude` method picker shows the equivalent warning instead: third-party harness usage is billed per token as
+`/login claude` sign-in prompts show the equivalent warning instead: third-party harness usage is billed per token as
 extra usage, outside your Claude plan limits. Manage extra usage at https://claude.ai/settings/usage.
 
 Treat subscription OAuth as an account-level credential, not as a way to move plan limits into another harness. Review

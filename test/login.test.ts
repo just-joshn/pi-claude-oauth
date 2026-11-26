@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { AuthEvent, AuthPrompt, ProviderAuthInteraction } from "@earendil-works/pi-ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { startLoopbackServer } from "../src/callback-server.ts";
 import { login, type LoginDependencies } from "../src/login.ts";
 import {
   buildAuthorizeUrl,
@@ -69,6 +70,26 @@ const authUrl = (events: AuthEvent[]): URL => {
   return new URL(event.url);
 };
 
+function pastingOnce(method: string, paste: (state: string) => string) {
+  const fake = interaction(method);
+  let pasted = false;
+  const value: ProviderAuthInteraction = {
+    ...fake.interaction,
+    prompt: async (prompt) => {
+      if (prompt.type !== "manual_code") {
+        return fake.interaction.prompt(prompt);
+      }
+      fake.prompts.push(prompt);
+      if (pasted) {
+        throw new Error("Login cancelled");
+      }
+      pasted = true;
+      return paste(authUrl(fake.events).searchParams.get("state") ?? "");
+    },
+  };
+  return { ...fake, interaction: value };
+}
+
 function expectPkceExchange(call: unknown, url: URL): void {
   if (
     !call ||
@@ -127,13 +148,26 @@ describe("login", () => {
       expect(JSON.stringify([prompts, events])).not.toContain("sk-ant-oat01-env-fixture");
     });
 
-    it.each([undefined, "invalid"])(
-      "explains how to supply a valid environment token (%s)",
+    it.each([undefined, "", "  "])(
+      "asks for the environment token when it is unset (%j)",
       async (value) => {
         if (value === undefined) delete process.env[name];
         else process.env[name] = value;
         const { interaction: fake, prompts } = interaction("setup_token", ["sk-ant-oat01-decoy"]);
-        await expect(login(fake)).rejects.toThrow(/CLAUDE_CODE_OAUTH_TOKEN/);
+        await expect(login(fake)).rejects.toThrow(/Set CLAUDE_CODE_OAUTH_TOKEN/);
+        expect(prompts).toHaveLength(1);
+      },
+    );
+
+    it.each(['"sk-ant-oat01-AAAA"', "sk-ant-oat01-AAAA\nBBBB", "sk-ant-api03-AAAA"])(
+      "says the environment token is set but unusable without echoing it (%j)",
+      async (value) => {
+        process.env[name] = value;
+        const { interaction: fake, prompts } = interaction("setup_token", ["sk-ant-oat01-decoy"]);
+        const attempt = login(fake);
+        await expect(attempt).rejects.toThrow(ClaudeAuthError);
+        await expect(attempt).rejects.toThrow(/CLAUDE_CODE_OAUTH_TOKEN is set/);
+        await expect(attempt).rejects.not.toThrow(/AAAA/);
         expect(prompts).toHaveLength(1);
       },
     );
@@ -167,11 +201,6 @@ describe("login", () => {
     ).rejects.toThrow(/did not include a refresh token/);
   });
 
-  it("rejects a copy-code result from another sign-in request", async () => {
-    const { interaction: fake } = interaction("copy_code", ["the-code#other-state"]);
-    await expect(login(fake)).rejects.toThrow(/different request/);
-  });
-
   it("asks again after a blank copy-code paste", async () => {
     const { interaction: fake, prompts } = interaction("copy_code", ["", "   ", "the-code"]);
     const { calls, dependencies } = recordExchange();
@@ -188,24 +217,138 @@ describe("login", () => {
     expect(calls[0]).toMatchObject({ code: "the-code" });
   });
 
-  it("rejects a pasted result without a code", async () => {
-    const { interaction: fake } = interaction("copy_code", ["/callback?scope=user"]);
-    await expect(login(fake)).rejects.toThrow(/No authorization code/);
+  it.each([
+    [
+      "the sign-in link",
+      buildAuthorizeUrl({
+        redirectUri: CLAUDE_COPY_CODE_REDIRECT_URI,
+        state: "state",
+        challenge: "challenge",
+      }),
+      "That is the sign-in link. Paste the address you land on after signing in.",
+    ],
+    ["a result from another request", "the-code#other-state", "belongs to a different request"],
+    ["a result without a code", "/callback?scope=user", "No authorization code was found"],
+  ])("explains why %s was refused and asks again", async (_name, paste, reason) => {
+    const { interaction: fake, events, prompts } = interaction("copy_code", [paste, "the-code"]);
+    const { calls, dependencies } = recordExchange();
+
+    await login(fake, dependencies);
+
+    const notices = events.flatMap((event) => (event.type === "info" ? [event.message] : []));
+    expect(notices).toHaveLength(1);
+    expect(notices[0]).toContain(reason);
+    expect(prompts.filter((prompt) => prompt.type === "manual_code")).toHaveLength(2);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ code: "the-code" });
   });
 
-  it("rejects a pasted sign-in link without contacting Claude", async () => {
-    const link = buildAuthorizeUrl({
-      redirectUri: CLAUDE_COPY_CODE_REDIRECT_URI,
-      state: "state",
-      challenge: "challenge",
-    });
-    const { interaction: fake } = interaction("copy_code", [link]);
+  it("asks again when a fragment of this login's sign-in link is pasted", async () => {
+    let link = "";
+    let pastes = 0;
+    const notices: string[] = [];
+    const fake: ProviderAuthInteraction = {
+      signal: new AbortController().signal,
+      notify: (event) => {
+        if (event.type === "auth_url") {
+          link = event.url;
+        }
+        if (event.type === "info") {
+          notices.push(event.message);
+        }
+      },
+      prompt: async (prompt) => {
+        if (prompt.type === "select") {
+          return "copy_code";
+        }
+        pastes += 1;
+        return pastes === 1 ? link.slice(link.indexOf("state=") + 6) : "the-code";
+      },
+    };
+    const { calls, dependencies } = recordExchange();
+
+    await login(fake, dependencies);
+
+    expect(notices).toEqual([
+      "That is the sign-in link. Paste the address you land on after signing in.",
+    ]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ code: "the-code" });
+  });
+
+  it("ends the sign-in when the pasted result reports a denial", async () => {
+    const { interaction: fake, prompts } = interaction("copy_code", [
+      "/callback?error=access_denied",
+      "the-code",
+    ]);
     const { calls, dependencies } = recordExchange();
 
     const attempt = login(fake, dependencies);
     await expect(attempt).rejects.toThrow(ClaudeAuthError);
-    await expect(attempt).rejects.toThrow(/not the sign-in link/);
+    await expect(attempt).rejects.toThrow(/declined/);
+    expect(prompts.filter((prompt) => prompt.type === "manual_code")).toHaveLength(1);
     expect(calls).toHaveLength(0);
+  });
+
+  it("ends the sign-in with the provider's reason when this request was denied", async () => {
+    const { interaction: fake, prompts } = pastingOnce(
+      "copy_code",
+      (state) => `/callback?error=access_denied&error_description=User%20denied&state=${state}`,
+    );
+    const { calls, dependencies } = recordExchange();
+
+    const attempt = login(fake, dependencies);
+    await expect(attempt).rejects.toThrow(ClaudeAuthError);
+    await expect(attempt).rejects.toThrow("Claude sign-in was declined: User denied");
+    expect(prompts.filter((prompt) => prompt.type === "manual_code")).toHaveLength(1);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("ends the sign-in as failed, not declined, when the pasted result reports a server error", async () => {
+    const { interaction: fake, prompts } = pastingOnce(
+      "copy_code",
+      (state) => `/callback?error=temporarily_unavailable&state=${state}`,
+    );
+    const { calls, dependencies } = recordExchange();
+
+    const attempt = login(fake, dependencies);
+    await expect(attempt).rejects.toThrow(ClaudeAuthError);
+    await expect(attempt).rejects.toThrow("Claude sign-in failed: temporarily_unavailable");
+    expect(prompts.filter((prompt) => prompt.type === "manual_code")).toHaveLength(1);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("exchanges a copy-code result wrapped in backticks", async () => {
+    const { interaction: fake } = pastingOnce("copy_code", (state) => `\`the-code#${state}\``);
+    const { calls, dependencies } = recordExchange();
+
+    await login(fake, dependencies);
+
+    expect(calls[0]).toMatchObject({ code: "the-code" });
+  });
+
+  it("asks again when a denial from another browser sign-in is pasted", async () => {
+    const {
+      interaction: fake,
+      events,
+      prompts,
+    } = interaction("browser", [
+      "http://localhost:53692/callback?error=access_denied&error_description=The+user+denied+access&state=other-state",
+      "pasted-code",
+    ]);
+    const { calls, dependencies } = recordExchange();
+
+    await login(fake, {
+      ...dependencies,
+      startServer: async () => {
+        throw new Error("port in use");
+      },
+    });
+
+    const notices = events.flatMap((event) => (event.type === "info" ? [event.message] : []));
+    expect(notices).toEqual(["The pasted sign-in result belongs to a different request."]);
+    expect(prompts.filter((prompt) => prompt.type === "manual_code")).toHaveLength(2);
+    expect(calls[0]).toMatchObject({ code: "pasted-code" });
   });
 
   it("exchanges the code from the local browser callback", async () => {
@@ -253,6 +396,31 @@ describe("login", () => {
     expect(calls[0]).toMatchObject({ code: "callback-code" });
   });
 
+  it("accepts the browser redirect after an invalid paste", async () => {
+    const { interaction: fake, events, prompts } = interaction("browser", ["the-code#other-state"]);
+    const { calls, dependencies } = recordExchange();
+    const pastePrompts = () => prompts.filter((prompt) => prompt.type === "manual_code");
+
+    const pending = login(fake, {
+      ...dependencies,
+      startServer: (options) => startLoopbackServer({ ...options, ports: [0] }),
+    });
+    await vi.waitFor(() => expect(pastePrompts()).toHaveLength(2));
+
+    const url = authUrl(events);
+    const redirect = new URL(url.searchParams.get("redirect_uri") ?? "");
+    redirect.searchParams.set("code", "callback-code");
+    redirect.searchParams.set("state", url.searchParams.get("state") ?? "");
+    const response = await fetch(redirect);
+    await response.body?.cancel();
+
+    expect(response.status).toBe(200);
+    await pending;
+    expect(events.some((event) => event.type === "info")).toBe(true);
+    expect(pastePrompts().at(-1)?.signal?.aborted).toBe(true);
+    expect(calls[0]).toMatchObject({ code: "callback-code" });
+  });
+
   it("releases the listener before exchanging a manually entered browser code", async () => {
     const { interaction: fake } = interaction("browser", ["pasted-code"]);
     const close = vi.fn(() => {});
@@ -267,6 +435,42 @@ describe("login", () => {
         return tokenResponse();
       },
     });
+  });
+
+  it("completes sign-in from a browser redirect that arrives an hour later", async () => {
+    const { interaction: fake, events } = interaction("browser");
+    const { calls, dependencies } = recordExchange();
+    const started = Promise.withResolvers<void>();
+
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    let pending: Promise<unknown>;
+    try {
+      pending = login(fake, {
+        ...dependencies,
+        startServer: async (options) => {
+          const server = await startLoopbackServer({ ...options, ports: [0] });
+          started.resolve();
+          return server;
+        },
+      });
+      await started.promise;
+      vi.advanceTimersByTime(60 * 60_000);
+    } finally {
+      vi.useRealTimers();
+    }
+    await vi.waitFor(() => authUrl(events));
+
+    const url = authUrl(events);
+    const redirect = new URL(url.searchParams.get("redirect_uri") ?? "");
+    redirect.searchParams.set("code", "late-code");
+    redirect.searchParams.set("state", url.searchParams.get("state") ?? "");
+    const response = await fetch(redirect);
+    await response.body?.cancel();
+
+    expect(response.status).toBe(200);
+    await pending;
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ code: "late-code" });
   });
 
   it("accepts a pasted redirect URL when no callback server can start", async () => {

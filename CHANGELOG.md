@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.1.5] - 2026-11-26
+
+### Fixed
+
+- A pasted sign-in result that is wrong (the sign-in link or any piece of it, a result from another request, or one
+  without a code) now explains why and asks again instead of ending sign-in and closing the browser callback.
+- Browser sign-in keeps listening until sign-in ends; the 10-minute limit that silently refused late redirects is gone.
+- Pastes wrapped in `<>`, quotes or backticks, broken across lines, or holding only the query part are read correctly.
+- Only `access_denied` is reported as a decline; other authorization errors say sign-in failed. A denial with an empty
+  description names the error, and a stale denial from another sign-in asks again.
+- `CLAUDE_CODE_OAUTH_TOKEN` and imported setup tokens must be single-line `sk-ant-oat` tokens. Other values are no
+  longer sent as API keys, a malformed saved setup token is no longer sent, and the import message says whether the
+  variable is unset or invalid.
+- `/login claude` → **Sign in with an API key** now asks for a setup token, saves it, and shows the billing warning.
+- Pi starts `claude` on the same default model as its `anthropic` provider instead of the first model in the catalog.
+- `/claude usage` shows model-scoped weekly limits, dates reset times, states each error cause once, and gives renewal
+  advice that works when a credential is saved.
+- `/claude status` labels every Pi credential source.
+- CI compares a pull request's version against its base, so force-pushed pull requests no longer fail the check.
+- README: the catalog follows the installed Pi version, the callback port can fall back, and the renewal steps are
+  correct.
+
 ## [0.1.4] - 2026-11-26
 
 ### Fixed

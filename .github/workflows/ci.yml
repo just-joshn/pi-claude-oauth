@@ -39,7 +39,7 @@ jobs:
       - name: Check release version
         id: version
         env:
-          BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
           previous=$(git show "$BASE_SHA:package.json" | jq -er '.version')
           version=$(jq -er '.version' package.json)

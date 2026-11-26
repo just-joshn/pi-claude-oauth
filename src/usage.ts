@@ -1,3 +1,4 @@
+import { CLAUDE_PROVIDER_ID } from "./models.ts";
 import {
   CLAUDE_OAUTH_BETA,
   ClaudeAuthError,
@@ -34,6 +35,24 @@ interface FetchUsageOptions {
 
 const clampPercent = (value: number): number => Math.min(100, Math.max(0, value));
 
+function scopedWeeklyBucket(limit: unknown): UsageBucket | undefined {
+  if (!isRecord(limit) || limit["kind"] !== "weekly_scoped") {
+    return undefined;
+  }
+  const percent = limit["percent"];
+  const scope = limit["scope"];
+  const model = isRecord(scope) ? scope["model"] : undefined;
+  const name = isRecord(model) ? model["display_name"] : undefined;
+  if (typeof percent !== "number" || !Number.isFinite(percent) || typeof name !== "string") {
+    return undefined;
+  }
+  return {
+    label: `7-day ${name}`,
+    utilization: clampPercent(percent),
+    resetsAt: typeof limit["resets_at"] === "string" ? limit["resets_at"] : undefined,
+  };
+}
+
 export function parseUsage(value: unknown): UsageReport {
   if (!isRecord(value)) throw new ClaudeAuthError("Claude returned an unexpected usage response.");
 
@@ -49,6 +68,13 @@ export function parseUsage(value: unknown): UsageReport {
     });
   }
 
+  for (const limit of Array.isArray(value["limits"]) ? value["limits"] : []) {
+    const bucket = scopedWeeklyBucket(limit);
+    if (bucket) {
+      buckets.push(bucket);
+    }
+  }
+
   if (buckets.length === 0) {
     throw new ClaudeAuthError("Claude reported no usage windows for this account.");
   }
@@ -58,7 +84,13 @@ export function parseUsage(value: unknown): UsageReport {
 export function formatResetTime(value: string): string | undefined {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return undefined;
-  return date.toLocaleString(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export function formatUsage(
@@ -90,7 +122,7 @@ export async function fetchUsage(
 
   if (status === 401 || status === 403) {
     throw new ClaudeAuthError(
-      `Claude rejected the saved token for usage lookup (HTTP ${status}). Run \`/login claude\` again.`,
+      `Claude rejected this token for usage lookup (HTTP ${status}). Run /login ${CLAUDE_PROVIDER_ID} to sign in again or paste a new setup token.`,
     );
   }
   if (!ok) {
