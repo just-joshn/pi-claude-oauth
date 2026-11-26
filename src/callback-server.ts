@@ -13,170 +13,175 @@ const redirectUriFor = (port: number): string => `http://localhost:${port}${CALL
 export const DEFAULT_REDIRECT_URI = redirectUriFor(PREFERRED_PORT);
 
 interface LoopbackServerOptions {
-  readonly state: string;
-  readonly signal?: AbortSignal;
-  readonly ports?: readonly number[];
+	readonly state: string;
+	readonly signal?: AbortSignal;
+	readonly ports?: readonly number[];
 }
 
 export interface LoopbackServer {
-  readonly redirectUri: string;
-  waitForCode(): Promise<string>;
-  close(): void;
+	readonly redirectUri: string;
+	waitForCode(): Promise<string>;
+	close(): void;
 }
 
-interface Reply {
-  readonly status: number;
-  readonly title: string;
-  readonly message: string;
-  readonly code?: string;
-  readonly failure?: string;
-}
+type Reply = {
+	readonly title: string;
+	readonly message: string;
+} & (
+	| { readonly outcome: "ignore"; readonly status: 400 | 404 }
+	| { readonly outcome: "failure"; readonly status: 400; readonly failure: string }
+	| { readonly outcome: "code"; readonly status: 200; readonly code: string }
+);
 
 const escapeHtml = (value: string): string =>
-  value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+	value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 function page(title: string, message: string): string {
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title></head><body style="font-family: system-ui, sans-serif; margin: 4rem auto; max-width: 32rem; line-height: 1.5"><h1>${escapeHtml(title)}</h1><p>${escapeHtml(message)}</p></body></html>`;
+	return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title></head><body style="font-family: system-ui, sans-serif; margin: 4rem auto; max-width: 32rem; line-height: 1.5"><h1>${escapeHtml(title)}</h1><p>${escapeHtml(message)}</p></body></html>`;
 }
 
 function replyTo(request: IncomingMessage, state: string): Reply {
-  const url = URL.parse(request.url ?? "/", "http://localhost");
-  if (!url) return { status: 400, title: "Bad request", message: NOT_THE_REDIRECT };
-  if (request.method !== "GET" || url.pathname !== CALLBACK_PATH) {
-    return { status: 404, title: "Not found", message: NOT_THE_REDIRECT };
-  }
+	const url = URL.parse(request.url ?? "/", "http://localhost");
+	if (!url) return { outcome: "ignore", status: 400, title: "Bad request", message: NOT_THE_REDIRECT };
+	if (request.method !== "GET" || url.pathname !== CALLBACK_PATH) {
+		return { outcome: "ignore", status: 404, title: "Not found", message: NOT_THE_REDIRECT };
+	}
 
-  if (url.searchParams.get("state") !== state) {
-    return {
-      status: 400,
-      title: "Sign-in mismatch",
-      message: "This redirect does not belong to the sign-in that is waiting.",
-    };
-  }
+	if (url.searchParams.get("state") !== state) {
+		return {
+			outcome: "ignore",
+			status: 400,
+			title: "Sign-in mismatch",
+			message: "This redirect does not belong to the sign-in that is waiting.",
+		};
+	}
 
-  const failure = authorizationFailure(url.searchParams);
-  if (failure) {
-    return {
-      status: 400,
-      title: failure.title,
-      message: failure.detail,
-      failure: failure.message,
-    };
-  }
+	const failure = authorizationFailure(url.searchParams);
+	if (failure) {
+		return {
+			outcome: "failure",
+			status: 400,
+			title: failure.title,
+			message: failure.detail,
+			failure: failure.message,
+		};
+	}
 
-  const code = url.searchParams.get("code");
-  if (!code) {
-    return {
-      status: 400,
-      title: "Missing code",
-      message: "Claude did not send an authorization code.",
-    };
-  }
+	const code = url.searchParams.get("code");
+	if (!code) {
+		return {
+			outcome: "ignore",
+			status: 400,
+			title: "Missing code",
+			message: "Claude did not send an authorization code.",
+		};
+	}
 
-  return {
-    status: 200,
-    title: "Authorization received",
-    message: "Return to Pi to finish signing in. You can close this tab.",
-    code,
-  };
+	return {
+		outcome: "code",
+		status: 200,
+		title: "Authorization received",
+		message: "Return to Pi to finish signing in. You can close this tab.",
+		code,
+	};
 }
 
 function listen(host: string, port: number): Promise<Server | undefined> {
-  const server = createServer();
-  return new Promise((resolve, reject) => {
-    const onError = (error: NodeJS.ErrnoException) => {
-      if (error.code === "EAFNOSUPPORT" || error.code === "EADDRNOTAVAIL") resolve(undefined);
-      else reject(error);
-    };
-    server.once("error", onError);
-    server.listen(port, host, () => {
-      server.off("error", onError);
-      resolve(server);
-    });
-  });
+	const server = createServer();
+	return new Promise((resolve, reject) => {
+		const onError = (error: NodeJS.ErrnoException) => {
+			if (error.code === "EAFNOSUPPORT" || error.code === "EADDRNOTAVAIL") resolve(undefined);
+			else reject(error);
+		};
+		server.once("error", onError);
+		server.listen(port, host, () => {
+			server.off("error", onError);
+			resolve(server);
+		});
+	});
 }
 
 const isPortUnavailable = (error: unknown): boolean =>
-  error instanceof Error &&
-  "code" in error &&
-  (error.code === "EADDRINUSE" || error.code === "EACCES");
+	error instanceof Error && "code" in error && (error.code === "EADDRINUSE" || error.code === "EACCES");
 
 function closeListeners(servers: readonly Server[]): void {
-  for (const server of servers) {
-    if (server.listening) server.close();
-  }
+	for (const server of servers) {
+		if (server.listening) server.close();
+	}
 }
 
 async function bindFirstFree(ports: readonly number[]) {
-  for (const candidate of ports) {
-    const servers: Server[] = [];
-    let port = candidate;
-    try {
-      for (const host of LOOPBACK_HOSTS) {
-        // oxlint-disable-next-line no-await-in-loop -- Both families must bind the same port, even when the OS picks it.
-        const server = await listen(host, port);
-        if (!server) continue;
-        servers.push(server);
-        const address = server.address();
-        if (!address || typeof address === "string") {
-          throw new ClaudeAuthError("The local sign-in callback has no TCP address.");
-        }
-        port = address.port;
-      }
-      if (servers.length) return { servers, port };
-    } catch (error) {
-      closeListeners(servers);
-      if (!isPortUnavailable(error)) throw error;
-    }
-  }
-  throw new ClaudeAuthError(
-    `Could not start the local sign-in callback on localhost (${ports.join(" or ")}). Close the program using that port and try again.`,
-  );
+	for (const candidate of ports) {
+		const servers: Server[] = [];
+		let port = candidate;
+		try {
+			for (const host of LOOPBACK_HOSTS) {
+				// The localhost redirect has one port, whether the browser connects over IPv4 or IPv6.
+				const server = await listen(host, port);
+				if (!server) continue;
+				servers.push(server);
+				const address = server.address();
+				if (!address || typeof address === "string") {
+					throw new ClaudeAuthError("The local sign-in callback has no TCP address.");
+				}
+				port = address.port;
+			}
+			if (servers.length) return { servers, port };
+		} catch (error) {
+			closeListeners(servers);
+			if (!isPortUnavailable(error)) throw error;
+		}
+	}
+	throw new ClaudeAuthError(
+		`Could not start the local sign-in callback on localhost (${ports.join(" or ")}). Close the program using that port and try again.`,
+	);
 }
 
 export async function startLoopbackServer(options: LoopbackServerOptions): Promise<LoopbackServer> {
-  if (options.signal?.aborted) throw new ClaudeAuthError("Claude sign-in was cancelled.");
+	if (options.signal?.aborted) throw new ClaudeAuthError("Claude sign-in was cancelled.");
 
-  const { servers, port } = await bindFirstFree(options.ports ?? DEFAULT_PORTS);
-  if (options.signal?.aborted) {
-    closeListeners(servers);
-    throw new ClaudeAuthError("Claude sign-in was cancelled.");
-  }
-  const { promise, resolve, reject } = Promise.withResolvers<string>();
+	const { servers, port } = await bindFirstFree(options.ports ?? DEFAULT_PORTS);
+	if (options.signal?.aborted) {
+		closeListeners(servers);
+		throw new ClaudeAuthError("Claude sign-in was cancelled.");
+	}
+	const { promise, resolve, reject } = Promise.withResolvers<string>();
 
-  const close = () => {
-    options.signal?.removeEventListener("abort", onAbort);
-    closeListeners(servers);
-  };
-  const fail = (message: string) => {
-    close();
-    reject(new ClaudeAuthError(message));
-  };
-  const onAbort = () => fail("Claude sign-in was cancelled.");
-  options.signal?.addEventListener("abort", onAbort, { once: true });
+	const close = () => {
+		options.signal?.removeEventListener("abort", onAbort);
+		closeListeners(servers);
+	};
+	const fail = (message: string) => {
+		close();
+		reject(new ClaudeAuthError(message));
+	};
+	const onAbort = () => fail("Claude sign-in was cancelled.");
+	options.signal?.addEventListener("abort", onAbort, { once: true });
 
-  const handleRequest = (request: IncomingMessage, response: ServerResponse) => {
-    const reply = replyTo(request, options.state);
-    response.writeHead(reply.status, {
-      "content-type": "text/html; charset=utf-8",
-      "cache-control": "no-store",
-    });
-    response.end(page(reply.title, reply.message));
+	const handleRequest = (request: IncomingMessage, response: ServerResponse) => {
+		const reply = replyTo(request, options.state);
+		response.writeHead(reply.status, {
+			"content-type": "text/html; charset=utf-8",
+			"cache-control": "no-store",
+		});
+		response.end(page(reply.title, reply.message));
 
-    if (reply.failure) fail(reply.failure);
-    if (reply.code) {
-      close();
-      resolve(reply.code);
-    }
-  };
-  for (const server of servers) {
-    server.on("request", handleRequest);
-    server.on("clientError", (_error, socket) => socket.destroy());
-  }
+		if (reply.outcome === "ignore") return;
+		if (reply.outcome === "failure") {
+			fail(reply.failure);
+			return;
+		}
+		close();
+		resolve(reply.code);
+	};
+	for (const server of servers) {
+		server.on("request", handleRequest);
+		server.on("clientError", (_error, socket) => socket.destroy());
+	}
 
-  return {
-    redirectUri: redirectUriFor(port),
-    waitForCode: () => promise,
-    close,
-  };
+	return {
+		redirectUri: redirectUriFor(port),
+		waitForCode: () => promise,
+		close,
+	};
 }
