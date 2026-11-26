@@ -2,6 +2,12 @@
 
 This changelog is for people who install the package. It lists, for each version, the changes that reach them, one change per entry. A version with no user-facing changes of its own has no sections; a short note under its heading says so. CI, tests, tooling and other changes that never reach the npm package stay out of it.
 
+## 0.1.6 (2026-11-26)
+
+CHANGED:
+
+- `/claude` no longer tries to send notifications or status updates when Pi has no UI. Successful status and usage lookups still save their cards to the session.
+
 ## 0.1.5 (2026-11-26)
 
 BREAKING CHANGES:
