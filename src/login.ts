@@ -33,8 +33,9 @@ function requireCode(input: string, expectedState: string): string {
       "The pasted sign-in result belongs to a different request. Start the login again.",
     );
   }
-  if (!parsed.code)
+  if (!parsed.code) {
     throw new ClaudeAuthError("No authorization code was found in that sign-in result.");
+  }
   return parsed.code;
 }
 

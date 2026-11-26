@@ -65,13 +65,13 @@ describe("startLoopbackServer", () => {
 
   it("rejects a declined authorization", async () => {
     const server = await startLoopbackServer({ state: STATE, ports: [0] });
-    const waiting = server.waitForCode();
+    const declined = expect(server.waitForCode()).rejects.toThrow(/declined: nope/);
 
     const response = await fetch(
       `${server.redirectUri}?error=access_denied&error_description=nope&state=${STATE}`,
     );
     expect(response.status).toBe(400);
-    await expect(waiting).rejects.toThrow(/declined: nope/);
+    await declined;
   });
 
   it("keeps waiting when a request has no code", async () => {

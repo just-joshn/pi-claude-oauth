@@ -2,10 +2,8 @@ export const CLAUDE_AUTHORIZE_URL = "https://claude.com/cai/oauth/authorize";
 export const CLAUDE_TOKEN_URL = "https://platform.claude.com/v1/oauth/token";
 export const CLAUDE_COPY_CODE_REDIRECT_URI = "https://platform.claude.com/oauth/code/callback";
 
-/** Claude Code's public PKCE client id; not a secret. */
 export const CLAUDE_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 
-/** Minimum Claude Code scope set that covers inference and account lookup. */
 export const CLAUDE_SCOPES = [
   "user:profile",
   "user:inference",
@@ -15,7 +13,6 @@ export const CLAUDE_SCOPES = [
 /** Beta flag the Messages API requires for OAuth access tokens. */
 export const CLAUDE_OAUTH_BETA = "oauth-2025-04-20";
 
-/** Every Claude subscription token, including `claude setup-token` output, starts with this. */
 export const CLAUDE_TOKEN_PREFIX = "sk-ant-oat";
 
 const TOKEN_TIMEOUT_MS = 30_000;
@@ -175,7 +172,6 @@ function failureDetails(payload: unknown): {
 
 const SECRET_FIELDS = ["code", "state", "code_verifier", "refresh_token"] as const;
 
-/** The server's error text is shown to the user, so strip any secret we sent that it echoes back. */
 function redact(serverText: string, sent: Record<string, string>): string {
   return SECRET_FIELDS.reduce((text, field) => {
     const secret = sent[field];
@@ -251,8 +247,9 @@ async function requestToken(
   );
 
   if (!ok) throw new ClaudeAuthError(describeFailure(status, payload, body));
-  if (payload === undefined)
+  if (payload === undefined) {
     throw new ClaudeAuthError("Claude returned a token response that was not valid JSON.");
+  }
   return parseTokenPayload(payload);
 }
 
@@ -271,8 +268,9 @@ export async function exchangeAuthorizationCode(
     },
     options,
   );
-  if (!token.refresh)
+  if (!token.refresh) {
     throw new ClaudeAuthError("Claude token response did not include a refresh token.");
+  }
   return { ...token, refresh: token.refresh };
 }
 

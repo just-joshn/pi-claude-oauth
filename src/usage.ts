@@ -97,7 +97,8 @@ export async function fetchUsage(
     throw new ClaudeAuthError(`Claude usage lookup failed (HTTP ${status}).`);
   }
 
-  if (payload === undefined)
+  if (payload === undefined) {
     throw new ClaudeAuthError("Claude returned usage data that was not valid JSON.");
+  }
   return parseUsage(payload);
 }
