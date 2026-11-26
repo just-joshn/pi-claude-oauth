@@ -70,6 +70,26 @@ const authUrl = (events: AuthEvent[]): URL => {
   return new URL(event.url);
 };
 
+function pastingOnce(method: string, paste: (state: string) => string) {
+  const fake = interaction(method);
+  let pasted = false;
+  const value: ProviderAuthInteraction = {
+    ...fake.interaction,
+    prompt: async (prompt) => {
+      if (prompt.type !== "manual_code") {
+        return fake.interaction.prompt(prompt);
+      }
+      fake.prompts.push(prompt);
+      if (pasted) {
+        throw new Error("Login cancelled");
+      }
+      pasted = true;
+      return paste(authUrl(fake.events).searchParams.get("state") ?? "");
+    },
+  };
+  return { ...fake, interaction: value };
+}
+
 function expectPkceExchange(call: unknown, url: URL): void {
   if (
     !call ||
@@ -222,6 +242,53 @@ describe("login", () => {
     await expect(attempt).rejects.toThrow(/declined/);
     expect(prompts.filter((prompt) => prompt.type === "manual_code")).toHaveLength(1);
     expect(calls).toHaveLength(0);
+  });
+
+  it("ends the sign-in with the provider's reason when this request was denied", async () => {
+    const { interaction: fake, prompts } = pastingOnce(
+      "copy_code",
+      (state) => `/callback?error=access_denied&error_description=User%20denied&state=${state}`,
+    );
+    const { calls, dependencies } = recordExchange();
+
+    const attempt = login(fake, dependencies);
+    await expect(attempt).rejects.toThrow(ClaudeAuthError);
+    await expect(attempt).rejects.toThrow("Claude sign-in was declined: User denied");
+    expect(prompts.filter((prompt) => prompt.type === "manual_code")).toHaveLength(1);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("exchanges a copy-code result wrapped in backticks", async () => {
+    const { interaction: fake } = pastingOnce("copy_code", (state) => `\`the-code#${state}\``);
+    const { calls, dependencies } = recordExchange();
+
+    await login(fake, dependencies);
+
+    expect(calls[0]).toMatchObject({ code: "the-code" });
+  });
+
+  it("asks again when a denial from another browser sign-in is pasted", async () => {
+    const {
+      interaction: fake,
+      events,
+      prompts,
+    } = interaction("browser", [
+      "http://localhost:53692/callback?error=access_denied&error_description=The+user+denied+access&state=other-state",
+      "pasted-code",
+    ]);
+    const { calls, dependencies } = recordExchange();
+
+    await login(fake, {
+      ...dependencies,
+      startServer: async () => {
+        throw new Error("port in use");
+      },
+    });
+
+    const notices = events.flatMap((event) => (event.type === "info" ? [event.message] : []));
+    expect(notices).toEqual(["The pasted sign-in result belongs to a different request."]);
+    expect(prompts.filter((prompt) => prompt.type === "manual_code")).toHaveLength(2);
+    expect(calls[0]).toMatchObject({ code: "pasted-code" });
   });
 
   it("exchanges the code from the local browser callback", async () => {

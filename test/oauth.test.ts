@@ -107,6 +107,7 @@ describe("parseAuthorizationInput", () => {
     ["<", ">"],
     ['"', '"'],
     ["'", "'"],
+    ["`", "`"],
   ])("reads a redirect URL wrapped in %s%s", (open, close) => {
     expect(
       parseAuthorizationInput(
