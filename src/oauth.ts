@@ -14,7 +14,7 @@ export const CLAUDE_OAUTH_BETA = "oauth-2025-04-20";
 
 export const CLAUDE_TOKEN_PREFIX = "sk-ant-oat";
 
-const AUTHORIZE_PATH = new URL(CLAUDE_AUTHORIZE_URL).pathname;
+const AUTHORIZE_PATH = "/oauth/authorize";
 const TOKEN_TIMEOUT_MS = 30_000;
 const DEFAULT_TOKEN_LIFETIME_SECONDS = 3_600;
 
