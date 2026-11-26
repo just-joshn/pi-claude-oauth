@@ -107,7 +107,7 @@ REMOVED:
    | Yes                 | No                        | Creates the `v<version>` tag and GitHub release at the commit npm recorded for the version. If npm recorded no commit, it creates neither.        |
    | Yes                 | Yes                       | Nothing.                                                                                                                                          |
 
-   The table applies to `just-joshn/pi-claude-oauth`. In a fork, the **Release** workflow runs CI only.
+   The table applies to `just-joshn/pi-claude-oauth`. In a fork, the **Release** workflow runs only CI and the read-only Version job, and never stages or releases.
 
 4. Approve the staged version in one of these ways:
    - Approve it with 2FA on npmjs.com.
@@ -120,7 +120,7 @@ REMOVED:
 If a release fails:
 
 1. Fix the cause.
-2. Rerun the failed jobs.
+2. Rerun all jobs. Rerunning only the failed jobs reuses the Version job's earlier answers about npm and the tag.
 
 Rules for reruns:
 

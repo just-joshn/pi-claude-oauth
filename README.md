@@ -45,12 +45,10 @@ Pi first asks how to sign in:
 
 | Option                                 | What it does                                                              |
 | -------------------------------------- | ------------------------------------------------------------------------- |
-| **Sign in with an API key**            | Asks you to paste a `claude setup-token` token and saves it in Pi.        |
 | **Sign in with a Claude subscription** | Offers three methods, listed under "Claude subscription sign-in methods". |
+| **Sign in with an API key**            | Asks you to paste a `claude setup-token` token and saves it in Pi.        |
 
 ### Claude subscription sign-in methods
-
-**Sign in with a Claude subscription** offers three methods:
 
 | Method                              | What it does                                                                                                                                                                                             |
 | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -208,7 +206,7 @@ src/
   provider.ts         native Pi provider with OAuth and ambient token auth
   login.ts            browser, copy-code, and setup-token login methods
   oauth.ts            endpoints, PKCE, authorize URL, token exchange, refresh
-  callback-server.ts  loopback redirect handler with manual fallback
+  callback-server.ts  loopback redirect handler
   credential.ts       credential shaping and setup-token rules
   models.ts           Claude catalog derived from Pi's Anthropic catalog
   usage.ts            /api/oauth/usage lookup and formatting
@@ -219,6 +217,6 @@ src/
 ## Limitations
 
 - Anthropic does not publish a long-term stability contract for this OAuth flow.
-- If Claude Code changes endpoints, scopes, or headers, the constants in `oauth.ts` need the same change.
+- If Claude Code changes endpoints, scopes, or headers, the constants in `oauth.ts` and `usage.ts` need the same change.
 - Usage windows come from Claude's internal usage endpoint.
 - When Claude's internal usage endpoint is unavailable, `/claude usage` reports the HTTP status instead of guessing.
