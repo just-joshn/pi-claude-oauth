@@ -33,23 +33,28 @@ NEW FEATURES:
 
 - A capability users did not have before.
 
-FIXED:
+ADDED:
 
-- What was wrong, and what happens now.
+- Something new that supports an existing capability, such as a command option, a check or a document.
+
+CHANGED:
+
+- What behaves differently now, including fixes: what was wrong, and what happens now.
 ```
 
 - Headings are `## MAJOR.MINOR.PATCH (YYYY-MM-DD)` for a released version and
   `## MAJOR.MINOR.PATCH (Unreleased)` for work toward a version that
   `package.json` does not have yet.
-- Sections appear in this order, and only when they have entries:
-  `BREAKING CHANGES:`, `NEW FEATURES:`, `ADDED:`, `CHANGED:`, `REMOVED:` and
-  `FIXED:`.
+- Only four sections exist. They appear in this order, and only when they
+  have entries: `BREAKING CHANGES:`, `NEW FEATURES:`, `ADDED:` and
+  `CHANGED:`. A fix or a removal goes under `CHANGED:`, or under
+  `BREAKING CHANGES:` when users must act.
 - Each entry is one full sentence on one line, written for the user: what
   changed and what they now see or do.
 
 CI fails unless `CHANGELOG.md` has a dated `## <version> (YYYY-MM-DD)` heading
 for the version in `package.json`, so a release cannot ship with an
-`(Unreleased)` heading.
+`(Unreleased)` heading. CI also fails on any section other than the four above.
 
 ## Cut a release
 

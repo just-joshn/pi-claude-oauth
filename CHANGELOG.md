@@ -2,21 +2,21 @@
 
 ## 0.1.6 (Unreleased)
 
-CHANGED:
-
-- CI runs on every pull request, including stacked ones, as two jobs: Lint (formatting, oxlint, types, the version and changelog check, and the package contents) and Test, which runs the tests with the coverage gate and a smoke test on real Pi on Node 22.19.0, 24 and 26. The check named `Verify` is gone.
-- Releases run in a separate Release workflow that calls CI on the pushed commit, stages the version on npm only when npm does not have it, and creates the tag and GitHub release at the released commit. Rerunning a release no longer needs the previous run's tarball.
-- The changelog uses `## X.Y.Z (YYYY-MM-DD)` headings, or `(Unreleased)` for a version not yet in `package.json`, with `BREAKING CHANGES:`, `NEW FEATURES:`, `ADDED:`, `CHANGED:`, `REMOVED:` and `FIXED:` sections. CI requires a dated entry for the version in `package.json`.
-
 ADDED:
 
 - `scripts/smoke.ts` starts real Pi in RPC mode with the extension and checks `/claude`, the `claude` models and the environment-token status card, without network calls.
 - An action lockfile, `.github/workflows/actions.lock`, and a workflow that verifies it. Workflows name actions by tag, and the lockfile pins each tag to its commit.
 - Dependabot waits a week before proposing a new release of an action.
 
+CHANGED:
+
+- CI runs on every pull request, including stacked ones, as two jobs: Lint (formatting, oxlint, types, the version and changelog check, and the package contents) and Test, which runs the tests with the coverage gate and a smoke test on real Pi on Node 22.19.0, 24 and 26. The check named `Verify` is gone.
+- Releases run in a separate Release workflow that calls CI on the pushed commit, stages the version on npm only when npm does not have it, and creates the tag and GitHub release at the released commit. Rerunning a release no longer needs the previous run's tarball.
+- The changelog uses `## X.Y.Z (YYYY-MM-DD)` headings, or `(Unreleased)` for a version not yet in `package.json`, with only `BREAKING CHANGES:`, `NEW FEATURES:`, `ADDED:` and `CHANGED:` sections. CI requires a dated entry for the version in `package.json` and rejects any other section.
+
 ## 0.1.5 (2026-11-26)
 
-FIXED:
+CHANGED:
 
 - A pasted sign-in result that is wrong (the sign-in link or any piece of it, a result from another request, or one without a code) now explains why and asks again instead of ending sign-in and closing the browser callback.
 - Browser sign-in keeps listening until sign-in ends; the 10-minute limit that silently refused late redirects is gone.
@@ -32,7 +32,7 @@ FIXED:
 
 ## 0.1.4 (2026-11-26)
 
-FIXED:
+CHANGED:
 
 - Pressing Enter on an empty paste prompt no longer ends sign-in or closes the local callback; Pi asks again.
 - Pasting the sign-in link itself is rejected with a clear message instead of sending `true` as the code.
@@ -42,7 +42,7 @@ FIXED:
 
 ## 0.1.3 (2026-11-24)
 
-FIXED:
+CHANGED:
 
 - Releases are staged on npm through trusted publishing and published after maintainer approval. Direct publishing was rejected, so 0.1.1 and 0.1.2 never reached npm; 0.1.3 contains their changes.
 
