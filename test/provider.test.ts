@@ -40,6 +40,28 @@ describe("claudeProvider", () => {
     });
   });
 
+  it("trims whitespace around the environment token", async () => {
+    const resolved = await claudeProvider().auth.apiKey?.resolve({
+      ctx: authContext(" sk-ant-oat01-token\r\n"),
+      signal: signal(),
+    });
+    expect(resolved).toEqual({
+      auth: { apiKey: "sk-ant-oat01-token" },
+      source: CLAUDE_CODE_OAUTH_TOKEN_ENV,
+    });
+  });
+
+  it.each(["sk-ant-api03-key", '"sk-ant-oat01-token"', "hunter2", "  "])(
+    "leaves the provider unconfigured for the non-setup-token environment value %j",
+    async (value) => {
+      const resolved = await claudeProvider().auth.apiKey?.resolve({
+        ctx: authContext(value),
+        signal: signal(),
+      });
+      expect(resolved).toBeUndefined();
+    },
+  );
+
   it.each([undefined, "ambient-fixture"])(
     "uses Pi's supplied key before the environment (%s)",
     async (ambient) => {
