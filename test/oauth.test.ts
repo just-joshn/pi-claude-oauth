@@ -104,6 +104,22 @@ describe("parseAuthorizationInput", () => {
   });
 
   it.each([
+    ["<", ">"],
+    ['"', '"'],
+    ["'", "'"],
+  ])("reads a redirect URL wrapped in %s%s", (open, close) => {
+    expect(
+      parseAuthorizationInput(
+        ` ${open}https://platform.claude.com/oauth/code/callback?code=abc&state=def${close} `,
+      ),
+    ).toEqual({ code: "abc", state: "def" });
+  });
+
+  it("reads a quoted code#state", () => {
+    expect(parseAuthorizationInput('"abc#def"')).toEqual({ code: "abc", state: "def" });
+  });
+
+  it.each([
     "localhost:53692/callback?code=abc&state=def",
     "platform.claude.com/oauth/code/callback?code=abc&state=def",
     "/callback?code=abc&state=def",
@@ -130,7 +146,9 @@ describe("parseAuthorizationInput", () => {
       challenge: "challenge",
     });
     expect(() => parseAuthorizationInput(link)).toThrow(ClaudeAuthError);
-    expect(() => parseAuthorizationInput(link)).toThrow(/address you land on after signing in/);
+    expect(() => parseAuthorizationInput(link)).toThrow(
+      "That is the sign-in link. Paste the address you land on after signing in.",
+    );
   });
 });
 

@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { AuthEvent, AuthPrompt, ProviderAuthInteraction } from "@earendil-works/pi-ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { startLoopbackServer } from "../src/callback-server.ts";
 import { login, type LoginDependencies } from "../src/login.ts";
 import {
   buildAuthorizeUrl,
@@ -167,11 +168,6 @@ describe("login", () => {
     ).rejects.toThrow(/did not include a refresh token/);
   });
 
-  it("rejects a copy-code result from another sign-in request", async () => {
-    const { interaction: fake } = interaction("copy_code", ["the-code#other-state"]);
-    await expect(login(fake)).rejects.toThrow(/different request/);
-  });
-
   it("asks again after a blank copy-code paste", async () => {
     const { interaction: fake, prompts } = interaction("copy_code", ["", "   ", "the-code"]);
     const { calls, dependencies } = recordExchange();
@@ -188,23 +184,43 @@ describe("login", () => {
     expect(calls[0]).toMatchObject({ code: "the-code" });
   });
 
-  it("rejects a pasted result without a code", async () => {
-    const { interaction: fake } = interaction("copy_code", ["/callback?scope=user"]);
-    await expect(login(fake)).rejects.toThrow(/No authorization code/);
+  it.each([
+    [
+      "the sign-in link",
+      buildAuthorizeUrl({
+        redirectUri: CLAUDE_COPY_CODE_REDIRECT_URI,
+        state: "state",
+        challenge: "challenge",
+      }),
+      "That is the sign-in link. Paste the address you land on after signing in.",
+    ],
+    ["a result from another request", "the-code#other-state", "belongs to a different request"],
+    ["a result without a code", "/callback?scope=user", "No authorization code was found"],
+  ])("explains why %s was refused and asks again", async (_name, paste, reason) => {
+    const { interaction: fake, events, prompts } = interaction("copy_code", [paste, "the-code"]);
+    const { calls, dependencies } = recordExchange();
+
+    await login(fake, dependencies);
+
+    const notices = events.flatMap((event) => (event.type === "info" ? [event.message] : []));
+    expect(notices).toHaveLength(1);
+    expect(notices[0]).toContain(reason);
+    expect(prompts.filter((prompt) => prompt.type === "manual_code")).toHaveLength(2);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ code: "the-code" });
   });
 
-  it("rejects a pasted sign-in link without contacting Claude", async () => {
-    const link = buildAuthorizeUrl({
-      redirectUri: CLAUDE_COPY_CODE_REDIRECT_URI,
-      state: "state",
-      challenge: "challenge",
-    });
-    const { interaction: fake } = interaction("copy_code", [link]);
+  it("ends the sign-in when the pasted result reports a denial", async () => {
+    const { interaction: fake, prompts } = interaction("copy_code", [
+      "/callback?error=access_denied",
+      "the-code",
+    ]);
     const { calls, dependencies } = recordExchange();
 
     const attempt = login(fake, dependencies);
     await expect(attempt).rejects.toThrow(ClaudeAuthError);
-    await expect(attempt).rejects.toThrow(/not the sign-in link/);
+    await expect(attempt).rejects.toThrow(/declined/);
+    expect(prompts.filter((prompt) => prompt.type === "manual_code")).toHaveLength(1);
     expect(calls).toHaveLength(0);
   });
 
@@ -250,6 +266,31 @@ describe("login", () => {
     expect(pastePrompts).toHaveLength(2);
     expect(pastePrompts.at(-1)?.signal?.aborted).toBe(true);
     expect(close).toHaveBeenCalled();
+    expect(calls[0]).toMatchObject({ code: "callback-code" });
+  });
+
+  it("accepts the browser redirect after an invalid paste", async () => {
+    const { interaction: fake, events, prompts } = interaction("browser", ["the-code#other-state"]);
+    const { calls, dependencies } = recordExchange();
+    const pastePrompts = () => prompts.filter((prompt) => prompt.type === "manual_code");
+
+    const pending = login(fake, {
+      ...dependencies,
+      startServer: (options) => startLoopbackServer({ ...options, ports: [0] }),
+    });
+    await vi.waitFor(() => expect(pastePrompts()).toHaveLength(2));
+
+    const url = authUrl(events);
+    const redirect = new URL(url.searchParams.get("redirect_uri") ?? "");
+    redirect.searchParams.set("code", "callback-code");
+    redirect.searchParams.set("state", url.searchParams.get("state") ?? "");
+    const response = await fetch(redirect);
+    await response.body?.cancel();
+
+    expect(response.status).toBe(200);
+    await pending;
+    expect(events.some((event) => event.type === "info")).toBe(true);
+    expect(pastePrompts().at(-1)?.signal?.aborted).toBe(true);
     expect(calls[0]).toMatchObject({ code: "callback-code" });
   });
 
