@@ -63,20 +63,27 @@ export function isRenderableCard(value: unknown): value is Pick<CardData, "title
 
 interface StatusInput {
   readonly configured: boolean;
-  readonly source?: string | undefined;
+  readonly source?: AuthSource | undefined;
   readonly envToken: boolean;
   readonly modelCount: number;
   readonly activeModel?: string | undefined;
 }
 
-const SOURCE_LABELS: Readonly<Record<string, string>> = {
+type AuthSource = NonNullable<
+  ReturnType<CommandContext["modelRegistry"]["getProviderAuthStatus"]>["source"]
+>;
+
+const SOURCE_LABELS: Readonly<Record<AuthSource, string>> = {
   stored: "saved credential",
   environment: "environment token",
   runtime: "runtime key",
+  fallback: "extension key",
+  models_json_key: "models.json key",
+  models_json_command: "models.json command",
 };
 
 export function statusCard(input: StatusInput, now = Date.now()): CardData {
-  const source = input.source ? (SOURCE_LABELS[input.source] ?? input.source) : undefined;
+  const source = input.source ? SOURCE_LABELS[input.source] : undefined;
   const lines: CardLine[] = [
     {
       text: input.configured ? `Signed in via ${source ?? "Claude OAuth"}` : "Not signed in",
@@ -108,10 +115,14 @@ export function usageCard(report: UsageReport, now = Date.now()): CardData {
 
 /** Pi wraps the provider's refresh error as `cause`; the cause carries the actionable text. */
 function describeError(error: unknown): string {
-  if (!(error instanceof Error)) return String(error);
-  return error.cause === undefined
-    ? error.message
-    : `${error.message}: ${describeError(error.cause)}`;
+  if (!(error instanceof Error)) {
+    return String(error);
+  }
+  if (error.cause === undefined) {
+    return error.message;
+  }
+  const cause = describeError(error.cause);
+  return error.message.includes(cause) ? error.message : `${error.message}: ${cause}`;
 }
 
 function showStatus(pi: CommandHost, ctx: CommandContext): void {
