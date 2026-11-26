@@ -4,14 +4,14 @@ This file lists the agent rule files for this repository, when to read each one,
 
 ## Rule files
 
-| Rule                                     | Purpose                                                              | Read it when                                                                  |
-| ---------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `./.agents/rules/coding-style.md`        | Code style rules                                                     | Before writing code, and before marking work complete                         |
-| `./.agents/rules/testing.md`             | Testing requirements and coverage targets                            | Before changing behavior in `src/`, and before writing or changing tests      |
-| `./.agents/rules/security.md`            | Security checklist and best practices                                | Before ANY commit, and when you find a security issue                         |
-| `./.agents/rules/performance.md`         | Performance guidelines                                               | Before implementing                                                           |
-| `./.agents/rules/git-workflow.md`        | Git commit and PR workflow                                           | Before you commit, name a branch, or create a pull request                    |
-| `./.agents/rules/karpathy-guidelines.md` | Coding discipline: think before coding, simplicity, surgical changes | Before any coding task                                                        |
+| Rule                                     | Purpose                                                              | Read it when                                                             |
+| ---------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `./.agents/rules/coding-style.md`        | Code style rules                                                     | Before writing code, and before marking work complete                    |
+| `./.agents/rules/testing.md`             | Testing requirements and coverage targets                            | Before changing behavior in `src/`, and before writing or changing tests |
+| `./.agents/rules/security.md`            | Security checklist and best practices                                | Before ANY commit, and when you find a security issue                    |
+| `./.agents/rules/performance.md`         | Performance guidelines                                               | Before implementing                                                      |
+| `./.agents/rules/git-workflow.md`        | Git commit and PR workflow                                           | Before you commit, name a branch, or create a pull request               |
+| `./.agents/rules/karpathy-guidelines.md` | Coding discipline: think before coding, simplicity, surgical changes | Before any coding task                                                   |
 
 ## Rule precedence
 

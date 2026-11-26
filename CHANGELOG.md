@@ -16,12 +16,11 @@ ADDED:
 CHANGED:
 
 - `/login claude` → **Sign in with an API key** accepts a pasted `claude setup-token` token and saves it. Before, it accepted nothing and said `CLAUDE_CODE_OAUTH_TOKEN` was configured outside Pi.
-- A wrong paste during sign-in explains what is wrong and asks again. This covers the sign-in link or any piece of it, a result from another sign-in, and a result without a code. Before, sign-in ended and the browser callback closed.
+- A wrong paste during sign-in explains what is wrong and asks again. This covers the sign-in link or any piece of it, a result from another sign-in, including a denial, and a result without a code. Before, sign-in ended and the browser callback closed.
 - Browser sign-in waits for the browser until sign-in ends. Before, it failed after 10 minutes.
 - Pasted results wrapped in `<>`, quotes or backticks, broken across lines, or holding only the query part are read correctly.
 - An authorization error other than `access_denied` says sign-in failed, not that it was declined.
 - A denial with an empty description shows the error code.
-- A pasted denial from an earlier sign-in asks again instead of ending this one.
 - A saved setup token that is not a single line is no longer sent, and Pi asks you to sign in again.
 - **Import setup token from environment** says whether `CLAUDE_CODE_OAUTH_TOKEN` is unset or holds something other than a setup token.
 - When `claude` is the only signed-in provider and no default model is saved, Pi starts on `claude-opus-5-5` instead of `claude-fable-5`.

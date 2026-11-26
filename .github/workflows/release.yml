@@ -110,7 +110,7 @@ jobs:
     needs: [version, publish]
     # `publish` is skipped when npm already has the version, so only a failed or
     # cancelled job stops the release.
-    if: ${{ !cancelled() && !failure() && needs.version.outputs.tagged != 'true' && needs.version.outputs.commit != '' }}
+    if: ${{ !cancelled() && !failure() && needs.version.outputs.tagged != 'true' && needs.version.outputs.commit != '' && github.repository == 'just-joshn/pi-claude-oauth' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

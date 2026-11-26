@@ -89,7 +89,7 @@ REMOVED:
 ### Changelog checks in CI
 
 - CI fails unless `CHANGELOG.md` has a dated `## <version> (YYYY-MM-DD)` heading for the version in `package.json`.
-- Because of that check, a release cannot ship with an `(Unreleased)` heading.
+- Because of that check, a release cannot ship with its own version still marked `(Unreleased)`.
 - CI also fails on any section label that is not one of the five listed under "Changelog sections".
 
 ## Cut a release
@@ -106,6 +106,8 @@ REMOVED:
    | No                  | Yes                       | Nothing. The version is staged and waiting for approval. npm does not list a staged version until it is approved, so the tag records the staging. |
    | Yes                 | No                        | Creates the `v<version>` tag and GitHub release at the commit npm recorded for the version. If npm recorded no commit, it creates neither.        |
    | Yes                 | Yes                       | Nothing.                                                                                                                                          |
+
+   The table applies to `just-joshn/pi-claude-oauth`. In a fork, the **Release** workflow runs CI only.
 
 4. Approve the staged version in one of these ways:
    - Approve it with 2FA on npmjs.com.

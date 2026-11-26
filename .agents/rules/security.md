@@ -13,7 +13,7 @@ Before ANY commit, check every item that applies to the code you changed. An ite
 - [ ] CSRF protection is enabled.
 - [ ] Authentication is verified.
 - [ ] Authorization is verified.
-- [ ] Rate limiting is on all endpoints.
+- [ ] Rate limiting is on all endpoints reachable from other machines.
 - [ ] Error messages do not leak sensitive data.
 
 ## Secret management

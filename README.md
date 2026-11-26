@@ -133,7 +133,7 @@ Treat subscription OAuth as an account-level credential, not as a way to move pl
 - Pi stores the credential in `~/.pi/agent/auth.json`.
 - The extension never writes tokens anywhere else.
 - Access and refresh tokens are never logged.
-- Error messages include the HTTP status and Anthropic's OAuth error code and description.
+- Error messages include the HTTP status or Anthropic's OAuth error code.
 - Error messages redact the submitted code, state, PKCE verifier, or refresh token.
 
 ### OAuth callback and PKCE

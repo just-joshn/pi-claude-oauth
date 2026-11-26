@@ -8,15 +8,19 @@ Purpose: coding style rules for immutability, file organization, error handling,
 - NEVER mutate function inputs or shared state.
 - A local variable that only the current function can see may change while the function builds its result.
 
-```javascript
+```typescript
+interface User {
+  name: string;
+}
+
 // WRONG: Mutation
-function updateUser(user, name) {
+function updateUser(user: User, name: string): User {
   user.name = name; // MUTATION!
   return user;
 }
 
 // CORRECT: Immutability
-function updateUser(user, name) {
+function updateUser(user: User, name: string): User {
   return { ...user, name };
 }
 ```
@@ -52,6 +56,8 @@ try {
 - Validate with type guards. The repository has no validation library.
 
 ```typescript
+const MAX_AGE = 150;
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -63,7 +69,7 @@ function parseSignUp(input: unknown): { email: string; age: number } {
   if (typeof email !== "string" || !email.includes("@")) {
     throw new Error("Invalid email");
   }
-  if (typeof age !== "number" || !Number.isInteger(age) || age < 0 || age > 150) {
+  if (typeof age !== "number" || !Number.isInteger(age) || age < 0 || age > MAX_AGE) {
     throw new Error("Invalid age");
   }
   return { email, age };
