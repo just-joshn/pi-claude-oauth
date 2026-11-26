@@ -3,13 +3,18 @@ import { getBuiltinModels } from "@earendil-works/pi-ai/providers/all";
 
 export const CLAUDE_PROVIDER_ID = "claude";
 export const CLAUDE_PROVIDER_NAME = "Claude (Pro/Max/Ultra)";
+const PI_ANTHROPIC_DEFAULT_MODEL_ID = "claude-opus-5-5";
+
+function isPiDefault(model: { id: string }) {
+  return Number(model.id === PI_ANTHROPIC_DEFAULT_MODEL_ID);
+}
 
 function withClaudeProvider<T extends { provider: string }>(entry: T) {
   return { ...entry, provider: CLAUDE_PROVIDER_ID };
 }
 
 export function claudeModels(): Model<"anthropic-messages">[] {
-  return getBuiltinModels("anthropic").map((model) => {
+  const models = getBuiltinModels("anthropic").map((model) => {
     const copy = withClaudeProvider(model);
     const fallbacks = model.compat?.allowedFallbackModels;
     if (fallbacks) {
@@ -18,4 +23,5 @@ export function claudeModels(): Model<"anthropic-messages">[] {
     }
     return copy;
   });
+  return models.toSorted((a, b) => isPiDefault(b) - isPiDefault(a));
 }

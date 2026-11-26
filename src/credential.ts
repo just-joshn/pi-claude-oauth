@@ -6,6 +6,8 @@ export const CLAUDE_CODE_OAUTH_TOKEN_ENV = "CLAUDE_CODE_OAUTH_TOKEN";
 
 export const SETUP_TOKEN_LIFETIME_MS = 365 * 24 * 60 * 60_000;
 
+const SETUP_TOKEN_PATTERN = new RegExp(`^${CLAUDE_TOKEN_PREFIX}[A-Za-z0-9_-]+$`);
+
 /** Stores the server's own deadline: Pi refreshes at least five minutes before `expires`. */
 export function toOAuthCredential(
   token: RefreshableTokenPayload,
@@ -21,7 +23,7 @@ export function toOAuthCredential(
 
 export function parseSetupToken(value: string | undefined): string | undefined {
   const token = value?.trim();
-  return token?.startsWith(CLAUDE_TOKEN_PREFIX) ? token : undefined;
+  return token !== undefined && SETUP_TOKEN_PATTERN.test(token) ? token : undefined;
 }
 
 export function setupTokenCredential(token: string | undefined, now = Date.now()): OAuthCredential {
