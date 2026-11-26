@@ -77,6 +77,17 @@ describe("startLoopbackServer", () => {
     await declined;
   });
 
+  it("names the error when a declined authorization has an empty description", async () => {
+    const server = await startLoopbackServer({ state: STATE, ports: [0] });
+    const declined = expect(server.waitForCode()).rejects.toThrow(/declined: access_denied$/);
+
+    const response = await fetch(
+      `${server.redirectUri}?error=access_denied&error_description=&state=${STATE}`,
+    );
+    expect(await response.text()).toContain("<p>access_denied</p>");
+    await declined;
+  });
+
   it("keeps waiting when a request has no code", async () => {
     const server = await startLoopbackServer({ state: STATE, ports: [0] });
     const waiting = server.waitForCode();

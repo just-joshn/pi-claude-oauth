@@ -135,6 +135,7 @@ describe("parseAuthorizationInput", () => {
       "User denied",
     ],
     ["/callback?error=access_denied&state=def", "access_denied"],
+    ["/callback?error=access_denied&error_description=&state=def", "access_denied"],
   ])("reads a pasted denial %s with its state", (input, denial) => {
     expect(parseAuthorizationInput(input)).toEqual({ code: undefined, state: "def", denial });
   });
