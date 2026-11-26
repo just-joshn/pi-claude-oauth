@@ -54,7 +54,9 @@ describe("startLoopbackServer", () => {
           socket.write(`GET ${target} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n`);
         });
         let received = "";
-        socket.on("data", (chunk) => (received += chunk));
+        socket.on("data", (chunk) => {
+          received += chunk;
+        });
         socket.on("close", () => resolve(received.split("\r\n")[0] ?? ""));
         socket.on("error", reject);
       });
@@ -76,6 +78,21 @@ describe("startLoopbackServer", () => {
     expect(response.status).toBe(400);
     expect(await response.text()).toContain("<h1>Sign-in declined</h1>");
     await declined;
+  });
+
+  it("rejects a matching redirect with an error even if it also contains a code", async () => {
+    const server = await startLoopbackServer({ state: STATE, ports: [0] });
+    try {
+      const [response] = await Promise.all([
+        fetch(`${server.redirectUri}?state=${STATE}&error=access_denied&code=unused`),
+        expect(server.waitForCode()).rejects.toThrow("Claude sign-in was declined: access_denied"),
+      ]);
+      expect(response.status).toBe(400);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      expect(await response.text()).toContain("<h1>Sign-in declined</h1>");
+    } finally {
+      server.close();
+    }
   });
 
   it.each([

@@ -24,13 +24,14 @@ export interface LoopbackServer {
   close(): void;
 }
 
-interface Reply {
-  readonly status: number;
+type Reply = {
   readonly title: string;
   readonly message: string;
-  readonly code?: string;
-  readonly failure?: string;
-}
+} & (
+  | { readonly outcome: "ignore"; readonly status: 400 | 404 }
+  | { readonly outcome: "failure"; readonly status: 400; readonly failure: string }
+  | { readonly outcome: "code"; readonly status: 200; readonly code: string }
+);
 
 const escapeHtml = (value: string): string =>
   value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -41,13 +42,15 @@ function page(title: string, message: string): string {
 
 function replyTo(request: IncomingMessage, state: string): Reply {
   const url = URL.parse(request.url ?? "/", "http://localhost");
-  if (!url) return { status: 400, title: "Bad request", message: NOT_THE_REDIRECT };
+  if (!url)
+    return { outcome: "ignore", status: 400, title: "Bad request", message: NOT_THE_REDIRECT };
   if (request.method !== "GET" || url.pathname !== CALLBACK_PATH) {
-    return { status: 404, title: "Not found", message: NOT_THE_REDIRECT };
+    return { outcome: "ignore", status: 404, title: "Not found", message: NOT_THE_REDIRECT };
   }
 
   if (url.searchParams.get("state") !== state) {
     return {
+      outcome: "ignore",
       status: 400,
       title: "Sign-in mismatch",
       message: "This redirect does not belong to the sign-in that is waiting.",
@@ -57,6 +60,7 @@ function replyTo(request: IncomingMessage, state: string): Reply {
   const failure = authorizationFailure(url.searchParams);
   if (failure) {
     return {
+      outcome: "failure",
       status: 400,
       title: failure.title,
       message: failure.detail,
@@ -67,6 +71,7 @@ function replyTo(request: IncomingMessage, state: string): Reply {
   const code = url.searchParams.get("code");
   if (!code) {
     return {
+      outcome: "ignore",
       status: 400,
       title: "Missing code",
       message: "Claude did not send an authorization code.",
@@ -74,6 +79,7 @@ function replyTo(request: IncomingMessage, state: string): Reply {
   }
 
   return {
+    outcome: "code",
     status: 200,
     title: "Authorization received",
     message: "Return to Pi to finish signing in. You can close this tab.",
@@ -163,11 +169,13 @@ export async function startLoopbackServer(options: LoopbackServerOptions): Promi
     });
     response.end(page(reply.title, reply.message));
 
-    if (reply.failure) fail(reply.failure);
-    if (reply.code) {
-      close();
-      resolve(reply.code);
+    if (reply.outcome === "ignore") return;
+    if (reply.outcome === "failure") {
+      fail(reply.failure);
+      return;
     }
+    close();
+    resolve(reply.code);
   };
   for (const server of servers) {
     server.on("request", handleRequest);
