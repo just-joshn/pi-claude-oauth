@@ -37,11 +37,11 @@ pi -e npm:pi-claude-oauth
 Pi first asks how to sign in. **Sign in with an API key** asks you to paste a `claude setup-token` token and saves it
 in Pi. **Sign in with a Claude subscription** offers three methods:
 
-| Method                              | What it does                                                                                                                                                    |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Browser sign-in                     | Authorizes in your browser and returns through `http://localhost:53692/callback`. If the browser runs on another machine, paste the final redirect URL instead. |
-| Copy code (headless)                | Uses Anthropic's manual redirect and asks you to paste the `code#state` value it shows. No local server.                                                        |
-| Import setup token from environment | Saves the `claude setup-token` token from `CLAUDE_CODE_OAUTH_TOKEN`. Pi never asks you to type or paste it.                                                     |
+| Method                              | What it does                                                                                                                                                                                        |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Browser sign-in                     | Authorizes in your browser and returns through `http://localhost:53692/callback`, or a free port when 53692 is taken. If the browser runs on another machine, paste the final redirect URL instead. |
+| Copy code (headless)                | Uses Anthropic's manual redirect and asks you to paste the `code#state` value it shows. No local server.                                                                                            |
+| Import setup token from environment | Saves the `claude setup-token` token from `CLAUDE_CODE_OAUTH_TOKEN`. Pi never asks you to type or paste it.                                                                                         |
 
 Prefer the browser flow interactively. For containers, CI, or any environment without a browser, export a setup token
 before starting Pi. Pi uses it directly, or `/login claude` can save it:

@@ -14,6 +14,7 @@ export const CLAUDE_OAUTH_BETA = "oauth-2025-04-20";
 
 export const CLAUDE_TOKEN_PREFIX = "sk-ant-oat";
 
+const AUTHORIZE_PATH = new URL(CLAUDE_AUTHORIZE_URL).pathname;
 const TOKEN_TIMEOUT_MS = 30_000;
 const DEFAULT_TOKEN_LIFETIME_SECONDS = 3_600;
 
@@ -139,7 +140,7 @@ export function parseAuthorizationInput(input: string): {
   if (queryStart !== -1 || value.includes("code=")) {
     const [query = ""] = value.slice(queryStart + 1).split("#", 1);
     const params = new URLSearchParams(query);
-    if (params.has("client_id")) {
+    if (params.has("client_id") || value.slice(0, queryStart).endsWith(AUTHORIZE_PATH)) {
       throw new InvalidPasteError(
         "That is the sign-in link. Paste the address you land on after signing in.",
       );
