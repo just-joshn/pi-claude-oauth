@@ -1,144 +1,106 @@
-name: CI and release
+name: CI
 
 on:
   pull_request:
-    branches: [main]
-  push:
-    branches: [main]
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  queue: max
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 
 defaults:
   run:
     shell: bash
 
 jobs:
-  verify:
-    name: Verify
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    outputs:
-      release-version: ${{ steps.version.outputs.release-version }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - name: Use Node.js
+        uses: actions/setup-node@v7.1.0
         with:
-          node-version: "24"
+          node-version: "24.x"
           package-manager-cache: false
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - name: Use Bun
+        uses: oven-sh/setup-bun@v2.2.0
         with:
           bun-version-file: package.json
-      - name: Check release version
-        id: version
+          no-cache: true
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Check formatting
+        run: bun run format:check
+      - name: Lint
+        run: bun run lint
+      - name: Check types
+        run: bun run typecheck
+      - name: Check the version and changelog
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          previous=$(git show "$BASE_SHA:package.json" | jq -er '.version')
-          version=$(jq -er '.version' package.json)
+          version=$(jq -er .version package.json)
           stable='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
           if [[ ! "$version" =~ $stable ]]; then
             echo "::error::package.json must use a stable MAJOR.MINOR.PATCH version"
             exit 1
           fi
-          if [[ "$version" == "$previous" ]]; then
-            exit 0
+          if [[ -n "$BASE_SHA" ]]; then
+            previous=$(git show "$BASE_SHA:package.json" | jq -er .version)
+            if [[ "$(printf '%s\n' "$previous" "$version" | sort -V | tail -n 1)" != "$version" ]]; then
+              echo "::error::package.json version must not decrease ($previous -> $version)"
+              exit 1
+            fi
           fi
-          if [[ "$(printf '%s\n' "$previous" "$version" | sort -V | tail -n 1)" != "$version" ]]; then
-            echo "::error::package.json version must increase"
+          if ! grep -Eq "^## ${version//./\\.} \([0-9]{4}-[0-9]{2}-[0-9]{2}\)$" CHANGELOG.md; then
+            echo "::error file=CHANGELOG.md::CHANGELOG.md needs a dated '## $version (YYYY-MM-DD)' entry"
             exit 1
           fi
-          printf 'release-version=%s\n' "$version" >> "$GITHUB_OUTPUT"
-      - run: bun install --frozen-lockfile
-      - run: bun run format:check
-      - run: bun run lint
-      - run: bun run typecheck
-      - run: bun run test:coverage
-      - name: Pack npm tarball
-        run: |
-          mkdir -p "$RUNNER_TEMP/npm-package"
-          npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP/npm-package"
-      - name: Upload release tarball
-        if: github.event_name == 'push' && steps.version.outputs.release-version != ''
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: npm-package
-          path: ${{ runner.temp }}/npm-package/*.tgz
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 30
-          overwrite: true
+          unknown=$(grep -nE '^[A-Z][A-Z ]*:$' CHANGELOG.md | grep -vE ':(NEW FEATURES|BREAKING CHANGES|ADDED|CHANGED|REMOVED):$' || true)
+          if [[ -n "$unknown" ]]; then
+            echo "::error file=CHANGELOG.md::Use only NEW FEATURES:, BREAKING CHANGES:, ADDED:, CHANGED: and REMOVED: sections. Found:"
+            echo "$unknown"
+            exit 1
+          fi
+      - name: Check the package contents
+        run: npm pack --dry-run --ignore-scripts
 
-  publish:
-    name: Stage on npm
-    needs: verify
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'just-joshn/pi-claude-oauth' && needs.verify.outputs.release-version != ''
+  test:
+    name: Test (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment: npm
-    permissions:
-      contents: read
-      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        # 22.19.0 is the oldest release that `engines` in package.json and Pi allow.
+        node-version: ["22.19.0", "24.x", "26.x"]
     steps:
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      - uses: actions/checkout@v7.0.1
         with:
-          name: npm-package
-          path: ${{ runner.temp }}/npm-package
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+          persist-credentials: false
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v7.1.0
         with:
-          node-version: "24"
-          registry-url: https://registry.npmjs.org
+          node-version: ${{ matrix.node-version }}
           package-manager-cache: false
-      - name: Publish the verified tarball
+      - name: Use Bun
+        uses: oven-sh/setup-bun@v2.2.0
+        with:
+          bun-version-file: package.json
+          no-cache: true
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Run the tests with the coverage gate
+        run: bun run test:coverage
+      - name: Run the smoke test on real Pi
+        run: node scripts/smoke.ts
         env:
-          VERSION: ${{ needs.verify.outputs.release-version }}
-        run: |
-          name=pi-claude-oauth
-          tarball="$RUNNER_TEMP/npm-package/$name-$VERSION.tgz"
-          test -f "$tarball"
-          versions=$(npm view "$name" versions --json --prefer-online)
-          if jq -e --arg version "$VERSION" 'index($version) != null' <<< "$versions" >/dev/null; then
-            published=$(npm view "$name@$VERSION" dist.integrity --prefer-online)
-            expected="sha512-$(openssl dgst -sha512 -binary "$tarball" | openssl base64 -A)"
-            if [[ "$published" != "$expected" ]]; then
-              echo "::error::$name@$VERSION already exists on npm with different contents"
-              exit 1
-            fi
-            echo "$name@$VERSION is already published with matching integrity"
-          else
-            npm stage publish "$tarball" --ignore-scripts --provenance --access public
-            echo "::notice::Approve $name@$VERSION with 2FA on npmjs.com or with npm stage approve to publish it"
-          fi
-
-  github-release:
-    name: Create GitHub release
-    needs: [verify, publish]
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: write
-    steps:
-      - name: Publish release notes
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: v${{ needs.verify.outputs.release-version }}
-        run: |
-          refs=$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$TAG" --jq '.[].ref')
-          if grep -Fxq "refs/tags/$TAG" <<< "$refs"; then
-            target=$(gh api "repos/$GITHUB_REPOSITORY/commits/tags/$TAG" --jq '.sha')
-            if [[ "$target" != "$GITHUB_SHA" ]]; then
-              echo "::error::$TAG points to $target, expected $GITHUB_SHA"
-              exit 1
-            fi
-          fi
-          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null; then
-            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
-              --target "$GITHUB_SHA" --title "$TAG" --generate-notes
-          fi
+          PI_BIN: ${{ github.workspace }}/node_modules/.bin/pi
