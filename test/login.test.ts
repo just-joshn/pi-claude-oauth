@@ -148,13 +148,26 @@ describe("login", () => {
       expect(JSON.stringify([prompts, events])).not.toContain("sk-ant-oat01-env-fixture");
     });
 
-    it.each([undefined, "invalid"])(
-      "explains how to supply a valid environment token (%s)",
+    it.each([undefined, "", "  "])(
+      "asks for the environment token when it is unset (%j)",
       async (value) => {
         if (value === undefined) delete process.env[name];
         else process.env[name] = value;
         const { interaction: fake, prompts } = interaction("setup_token", ["sk-ant-oat01-decoy"]);
-        await expect(login(fake)).rejects.toThrow(/CLAUDE_CODE_OAUTH_TOKEN/);
+        await expect(login(fake)).rejects.toThrow(/Set CLAUDE_CODE_OAUTH_TOKEN/);
+        expect(prompts).toHaveLength(1);
+      },
+    );
+
+    it.each(['"sk-ant-oat01-AAAA"', "sk-ant-oat01-AAAA\nBBBB", "sk-ant-api03-AAAA"])(
+      "says the environment token is set but unusable without echoing it (%j)",
+      async (value) => {
+        process.env[name] = value;
+        const { interaction: fake, prompts } = interaction("setup_token", ["sk-ant-oat01-decoy"]);
+        const attempt = login(fake);
+        await expect(attempt).rejects.toThrow(ClaudeAuthError);
+        await expect(attempt).rejects.toThrow(/CLAUDE_CODE_OAUTH_TOKEN is set/);
+        await expect(attempt).rejects.not.toThrow(/AAAA/);
         expect(prompts).toHaveLength(1);
       },
     );
