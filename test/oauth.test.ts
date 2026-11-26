@@ -132,12 +132,11 @@ describe("parseAuthorizationInput", () => {
   it.each([
     [
       "http://localhost:53692/callback?error=access_denied&error_description=User%20denied&state=def",
-      "Claude sign-in was declined: User denied",
+      "User denied",
     ],
-    ["/callback?error=access_denied&state=def", "Claude sign-in was declined: access_denied"],
-  ])("reports a pasted denial %s", (input, message) => {
-    expect(() => parseAuthorizationInput(input)).toThrow(ClaudeAuthError);
-    expect(() => parseAuthorizationInput(input)).toThrow(message);
+    ["/callback?error=access_denied&state=def", "access_denied"],
+  ])("reads a pasted denial %s with its state", (input, denial) => {
+    expect(parseAuthorizationInput(input)).toEqual({ code: undefined, state: "def", denial });
   });
 
   it("rejects the sign-in link itself", () => {

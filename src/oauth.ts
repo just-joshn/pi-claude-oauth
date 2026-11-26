@@ -98,7 +98,12 @@ export function buildAuthorizeUrl(options: AuthorizeUrlOptions): string {
   return `${CLAUDE_AUTHORIZE_URL}?${params.toString()}`;
 }
 
-const CLOSING_WRAPPERS: Readonly<Record<string, string>> = { "<": ">", '"': '"', "'": "'" };
+const CLOSING_WRAPPERS: Readonly<Record<string, string>> = {
+  "<": ">",
+  '"': '"',
+  "'": "'",
+  "`": "`",
+};
 
 function unwrap(value: string): string {
   const close = CLOSING_WRAPPERS[value.charAt(0)];
@@ -111,6 +116,7 @@ function unwrap(value: string): string {
 export function parseAuthorizationInput(input: string): {
   code?: string | undefined;
   state?: string | undefined;
+  denial?: string | undefined;
 } {
   const value = unwrap(input.trim());
   if (!value) return {};
@@ -119,12 +125,7 @@ export function parseAuthorizationInput(input: string): {
   if (queryStart !== -1 || value.includes("code=")) {
     const [query = ""] = value.slice(queryStart + 1).split("#", 1);
     const params = new URLSearchParams(query);
-    const error = params.get("error");
-    if (error) {
-      throw new ClaudeAuthError(
-        `Claude sign-in was declined: ${params.get("error_description") ?? error}`,
-      );
-    }
+    const error = params.get("error") || undefined;
     if (params.has("client_id")) {
       throw new InvalidPasteError(
         "That is the sign-in link. Paste the address you land on after signing in.",
@@ -133,6 +134,7 @@ export function parseAuthorizationInput(input: string): {
     return {
       code: params.get("code") ?? undefined,
       state: params.get("state") ?? undefined,
+      denial: error && (params.get("error_description") ?? error),
     };
   }
 

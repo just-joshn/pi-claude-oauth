@@ -32,6 +32,9 @@ function requireCode(input: string, expectedState: string): string {
   if (parsed.state !== undefined && parsed.state !== expectedState) {
     throw new InvalidPasteError("The pasted sign-in result belongs to a different request.");
   }
+  if (parsed.denial) {
+    throw new ClaudeAuthError(`Claude sign-in was declined: ${parsed.denial}`);
+  }
   if (!parsed.code) {
     throw new InvalidPasteError("No authorization code was found in that sign-in result.");
   }
