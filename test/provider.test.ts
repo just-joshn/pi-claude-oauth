@@ -51,7 +51,14 @@ describe("claudeProvider", () => {
     });
   });
 
-  it.each(["sk-ant-api03-key", '"sk-ant-oat01-token"', "hunter2", "  "])(
+  it.each([
+    "sk-ant-api03-key",
+    '"sk-ant-oat01-token"',
+    "hunter2",
+    "  ",
+    "sk-ant-oat01-AAAA\nBBBB",
+    "sk-ant-oat01-AAAABBBB\u201d",
+  ])(
     "leaves the provider unconfigured for the non-setup-token environment value %j",
     async (value) => {
       const resolved = await claudeProvider().auth.apiKey?.resolve({

@@ -7,6 +7,7 @@ import {
   setupTokenRefreshError,
   toOAuthCredential,
 } from "../src/credential.ts";
+import { ClaudeAuthError } from "../src/oauth.ts";
 
 describe("toOAuthCredential", () => {
   it("expires at the server deadline and leaves the early refresh to Pi", () => {
@@ -41,6 +42,14 @@ describe("setupTokenCredential", () => {
   it.each(["hunter2", "sk-ant-api03-key", ""])("rejects the non-Claude value %j", (value) => {
     expect(() => setupTokenCredential(value)).toThrow(/claude setup-token/);
   });
+
+  it.each(["sk-ant-oat01-AAAA\nBBBB", "sk-ant-oat01-AAAA BBBB", "sk-ant-oat01-AAAABBBB\u201d"])(
+    "rejects the malformed setup token %j without echoing it",
+    (value) => {
+      expect(() => setupTokenCredential(value)).toThrow(ClaudeAuthError);
+      expect(() => setupTokenCredential(value)).not.toThrow(/AAAA/);
+    },
+  );
 
   it("explains that a setup token cannot be refreshed", () => {
     expect(setupTokenRefreshError().message).toMatch(/cannot be refreshed/);

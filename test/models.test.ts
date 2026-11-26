@@ -9,6 +9,10 @@ describe("claudeModels", () => {
     expect(models.some((model) => model.id === "claude-opus-5-5")).toBe(true);
   });
 
+  it("lists the model Pi defaults to for Anthropic first, so a fresh Pi starts on it", () => {
+    expect(claudeModels()[0]?.id).toBe("claude-opus-5-5");
+  });
+
   it("stamps the Claude subscription provider id", () => {
     expect(claudeModels().every((model) => model.provider === CLAUDE_PROVIDER_ID)).toBe(true);
   });
