@@ -34,7 +34,8 @@ pi -e npm:pi-claude-oauth
 /login claude
 ```
 
-Three methods are offered:
+Pi first asks how to sign in. **Sign in with an API key** asks you to paste a `claude setup-token` token and saves it
+in Pi. **Sign in with a Claude subscription** offers three methods:
 
 | Method                              | What it does                                                                                                                                                    |
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -50,7 +51,7 @@ export CLAUDE_CODE_OAUTH_TOKEN="$(claude setup-token)"
 ```
 
 When a credential is stored, it wins over the environment variable. A setup token cannot be refreshed: when it expires,
-export a new one, restart Pi, and run `/login claude` again.
+export a new one and restart Pi, or paste it with `/login claude` and **Sign in with an API key**.
 
 ## Use it
 

@@ -27,10 +27,15 @@ export function parseSetupToken(value: string | undefined): string | undefined {
 }
 
 export function setupTokenCredential(token: string | undefined, now = Date.now()): OAuthCredential {
+  if (!token?.trim()) {
+    throw new ClaudeAuthError(
+      `Set ${CLAUDE_CODE_OAUTH_TOKEN_ENV} to a token from \`claude setup-token\` before starting Pi.`,
+    );
+  }
   const access = parseSetupToken(token);
   if (!access) {
     throw new ClaudeAuthError(
-      `Set ${CLAUDE_CODE_OAUTH_TOKEN_ENV} to a token from \`claude setup-token\` before starting Pi.`,
+      `${CLAUDE_CODE_OAUTH_TOKEN_ENV} is set, but it is not a single-line ${CLAUDE_TOKEN_PREFIX} token from \`claude setup-token\`. Fix the value and restart Pi.`,
     );
   }
   return { type: "oauth", access, refresh: "", expires: now + SETUP_TOKEN_LIFETIME_MS };

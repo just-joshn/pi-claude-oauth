@@ -210,6 +210,16 @@ describe("claudeProvider", () => {
     expect(auth).toEqual({ apiKey: "sk-ant-oat01-token" });
   });
 
+  it("sends a saved setup token without surrounding whitespace", async () => {
+    const auth = await claudeProvider().auth.oauth?.toAuth({
+      type: "oauth",
+      access: "sk-ant-oat01-token\n",
+      refresh: "",
+      expires: Date.now() + 1_000_000,
+    });
+    expect(auth).toEqual({ apiKey: "sk-ant-oat01-token" });
+  });
+
   it("refuses to send a saved setup token that is malformed, without echoing it", async () => {
     const auth = claudeProvider().auth.oauth?.toAuth({
       type: "oauth",
