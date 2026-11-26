@@ -1,38 +1,44 @@
 # Testing Rules
 
-## Minimum Test Coverage: 80%
+Purpose: testing rules for minimum test coverage, required test types, the test-driven development workflow, edge cases, and test quality.
 
-Test Types (ALL required):
+## Minimum test coverage
 
-1. **Unit Tests** - Individual functions, utilities, components
-2. **Integration Tests** - API endpoints, database operations
-3. **E2E Tests** - Critical user flows
+- Minimum test coverage is 80%.
+- All test types below are required.
 
-## Test-Driven Development
+| Test type         | Covers                                      |
+| ----------------- | ------------------------------------------- |
+| Unit tests        | Individual functions, utilities, components |
+| Integration tests | API endpoints, database operations          |
+| E2E tests         | Critical user flows                         |
 
-MANDATORY workflow:
+## Test-driven development workflow
 
-1. Write test first (RED)
-2. Run test - it should FAIL
-3. Write minimal implementation (GREEN)
-4. Run test - it should PASS
-5. Refactor (IMPROVE)
-6. Verify coverage (80%+)
+This workflow is mandatory:
 
-## Edge Cases to Test
+1. Write the test first. Phase: RED.
+2. Run the test. It should FAIL.
+3. Write a minimal implementation. Phase: GREEN.
+4. Run the test. It should PASS.
+5. Refactor. Phase: IMPROVE.
+6. Verify coverage is 80% or higher.
+
+## Edge cases to test
 
 Every function must be tested with:
 
 - [ ] Null/undefined inputs
-- [ ] Empty arrays/strings
+- [ ] Empty arrays
+- [ ] Empty strings
 - [ ] Invalid types
-- [ ] Boundary values (min/max)
+- [ ] Boundary values: min and max
 - [ ] Error conditions
 
-## Test Quality Checklist
+## Test quality checklist
 
-- [ ] Tests are independent (no shared state)
-- [ ] Test names describe behavior
-- [ ] Mocks used for external dependencies
-- [ ] Both happy path and error paths tested
-- [ ] No flaky tests
+- [ ] Tests are independent, with no shared state.
+- [ ] Test names describe behavior.
+- [ ] Mocks are used for external dependencies.
+- [ ] Both the happy path and error paths are tested.
+- [ ] No flaky tests.

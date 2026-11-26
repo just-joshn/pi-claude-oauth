@@ -1,6 +1,8 @@
 # Git Workflow Rules
 
-## Commit Message Format
+Purpose: git rules for commit message format, the pull request workflow, the feature implementation workflow, and branch naming.
+
+## Commit message format
 
 ```
 <type>: <description>
@@ -8,28 +10,30 @@
 <optional body>
 ```
 
-Types: feat, fix, refactor, docs, test, chore, perf, ci
+Commit types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`.
 
-## Pull Request Workflow
+## Pull request workflow
 
 When creating PRs:
 
-1. Analyze full commit history (not just latest commit)
-2. Use `git diff [base-branch]...HEAD` to see all changes
-3. Draft comprehensive PR summary
-4. Include test plan with TODOs
-5. Push with `-u` flag if new branch
+1. Analyze the full commit history, not just the latest commit.
+2. Use `git diff [base-branch]...HEAD` to see all changes.
+3. Draft a comprehensive PR summary.
+4. Include a test plan with TODOs.
+5. If the branch is new, push with the `-u` flag.
 
-## Feature Implementation Workflow
+## Feature implementation workflow
 
-1. **Plan First** - Use `planner` agent
-2. **TDD Approach** - Use `tdd-guide` agent
-3. **Code Review** - Use `code-reviewer` agent after writing code
-4. **Commit** - Follow conventional commits format
+1. Plan first: use the `planner` agent.
+2. TDD approach: use the `tdd-guide` agent.
+3. Code review: use the `code-reviewer` agent after writing code.
+4. Commit: follow the conventional commits format.
 
-## Branch Naming
+## Branch naming
 
-- `feature/` - New features
-- `fix/` - Bug fixes
-- `refactor/` - Code refactoring
-- `docs/` - Documentation changes
+| Prefix      | Use for               |
+| ----------- | --------------------- |
+| `feature/`  | New features          |
+| `fix/`      | Bug fixes             |
+| `refactor/` | Code refactoring      |
+| `docs/`     | Documentation changes |

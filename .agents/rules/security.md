@@ -1,19 +1,25 @@
 # Security Rules
 
-## Mandatory Security Checks
+Purpose: security rules for the mandatory checks before any commit, secret management, and the response protocol when a security issue is found.
 
-Before ANY commit:
+## Mandatory security checks
 
-- [ ] No hardcoded secrets (API keys, passwords, tokens)
-- [ ] All user inputs validated
-- [ ] SQL injection prevention (parameterized queries)
-- [ ] XSS prevention (sanitized HTML)
-- [ ] CSRF protection enabled
-- [ ] Authentication/authorization verified
-- [ ] Rate limiting on all endpoints
-- [ ] Error messages don't leak sensitive data
+These checks are mandatory before any commit:
 
-## Secret Management
+- [ ] No hardcoded secrets: API keys, passwords, tokens.
+- [ ] All user inputs are validated.
+- [ ] SQL injection is prevented with parameterized queries.
+- [ ] XSS is prevented with sanitized HTML.
+- [ ] CSRF protection is enabled.
+- [ ] Authentication is verified.
+- [ ] Authorization is verified.
+- [ ] Rate limiting is on all endpoints.
+- [ ] Error messages do not leak sensitive data.
+
+## Secret management
+
+- Never hardcode secrets.
+- Always use environment variables.
 
 ```typescript
 // NEVER: Hardcoded secrets
@@ -24,12 +30,12 @@ const apiKey = process.env.API_KEY
 if (!apiKey) throw new Error('API_KEY not configured')
 ```
 
-## Security Response Protocol
+## Security response protocol
 
-If security issue found:
+If a security issue is found:
 
-1. STOP immediately
-2. Use `security-reviewer` agent
-3. Fix CRITICAL issues before continuing
-4. Rotate any exposed secrets
-5. Review entire codebase for similar issues
+1. Stop immediately.
+2. Use the `security-reviewer` agent.
+3. Fix CRITICAL issues before continuing.
+4. Rotate any exposed secrets.
+5. Review the entire codebase for similar issues.
