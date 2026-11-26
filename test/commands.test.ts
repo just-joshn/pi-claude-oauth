@@ -1,3 +1,4 @@
+import { ModelsError } from "@earendil-works/pi-ai/models";
 import { getBuiltinModels } from "@earendil-works/pi-ai/providers/all";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -102,14 +103,16 @@ describe("statusCard", () => {
     expect(card.lines.at(-1)?.text).toBe("CLAUDE_CODE_OAUTH_TOKEN is set but Pi could not use it");
   });
 
-  it("shows an unknown source verbatim", () => {
-    const card = statusCard({
-      configured: true,
-      source: "models_json_key",
-      envToken: false,
-      modelCount: 1,
-    });
-    expect(card.lines[0]?.text).toBe("Signed in via models_json_key");
+  it("labels a key or command configured in models.json", () => {
+    const headlines = (["models_json_key", "models_json_command"] as const).map(
+      (source) =>
+        statusCard({ configured: true, source, envToken: false, modelCount: 1 }).lines[0]?.text,
+    );
+
+    expect(headlines).toEqual([
+      "Signed in via models.json key",
+      "Signed in via models.json command",
+    ]);
   });
 });
 
@@ -172,6 +175,19 @@ describe("/claude command", () => {
     await command.handler("usage", context(notifications, { authError }));
 
     expect(cards).toHaveLength(0);
+    expect(notifications.at(-1)).toEqual({
+      message: "OAuth refresh failed for claude: This Claude token cannot be refreshed.",
+      level: "error",
+    });
+  });
+
+  it("states a refresh failure once when Pi already folds the cause into the message", async () => {
+    const authError = new ModelsError("oauth", "OAuth refresh failed for claude", {
+      cause: new Error("This Claude token cannot be refreshed."),
+    });
+    const { notifications, command } = harness();
+    await command.handler("usage", context(notifications, { authError }));
+
     expect(notifications.at(-1)).toEqual({
       message: "OAuth refresh failed for claude: This Claude token cannot be refreshed.",
       level: "error",

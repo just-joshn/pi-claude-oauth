@@ -19,7 +19,63 @@ const usagePayload = {
   seven_day_oauth_apps: { utilization: 99 },
 };
 
+const liveUsagePayload = {
+  five_hour: { utilization: 2.0, resets_at: "2026-11-26T14:39:59.659791+00:00" },
+  seven_day: { utilization: 36.0, resets_at: "2026-12-01T06:59:59.659810+00:00" },
+  seven_day_oauth_apps: null,
+  seven_day_opus: null,
+  seven_day_sonnet: null,
+  limits: [
+    {
+      kind: "session",
+      group: "session",
+      percent: 2,
+      severity: "normal",
+      resets_at: "2026-11-26T14:39:59.659791+00:00",
+      scope: null,
+      is_active: false,
+    },
+    {
+      kind: "weekly_all",
+      group: "weekly",
+      percent: 36,
+      severity: "normal",
+      resets_at: "2026-12-01T06:59:59.659810+00:00",
+      scope: null,
+      is_active: true,
+    },
+    {
+      kind: "weekly_scoped",
+      group: "weekly",
+      percent: 2,
+      severity: "normal",
+      resets_at: "2026-12-01T06:59:59.659999+00:00",
+      scope: { model: { id: null, display_name: "Fable" }, surface: null },
+      is_active: false,
+    },
+  ],
+};
+
 describe("parseUsage", () => {
+  it("shows per-model weekly caps reported in limits", () => {
+    expect(parseUsage(liveUsagePayload).buckets).toEqual([
+      { label: "5-hour window", utilization: 2, resetsAt: "2026-11-26T14:39:59.659791+00:00" },
+      { label: "7-day window", utilization: 36, resetsAt: "2026-12-01T06:59:59.659810+00:00" },
+      { label: "7-day Fable", utilization: 2, resetsAt: "2026-12-01T06:59:59.659999+00:00" },
+    ]);
+  });
+
+  it("skips scoped weekly limits without a usable percent", () => {
+    const payload = {
+      five_hour: { utilization: 1 },
+      limits: [
+        { kind: "weekly_scoped", percent: null, scope: { model: { display_name: "Fable" } } },
+        { kind: "weekly_scoped", percent: "2", scope: { model: { display_name: "Opus" } } },
+      ],
+    };
+    expect(parseUsage(payload).buckets.map((bucket) => bucket.label)).toEqual(["5-hour window"]);
+  });
+
   it("reads the documented usage windows", () => {
     expect(parseUsage(usagePayload)).toEqual({
       buckets: [
@@ -94,9 +150,9 @@ describe("fetchUsage", () => {
     expect(report.buckets).toHaveLength(4);
   });
 
-  it("asks for a new sign-in when the token is rejected", async () => {
+  it("asks for a new sign-in or token when the token is rejected", async () => {
     await expect(fetchUsage("token", { fetch: async () => response({}, 401) })).rejects.toThrow(
-      /\/login claude/,
+      "Claude rejected this token for usage lookup (HTTP 401). Sign in again with /login claude or replace CLAUDE_CODE_OAUTH_TOKEN.",
     );
   });
 
