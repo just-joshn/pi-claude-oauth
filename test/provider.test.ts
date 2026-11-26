@@ -160,6 +160,7 @@ describe("claudeProvider", () => {
 
     expect(prompt).toHaveBeenCalledOnce();
     expect(prompt.mock.calls[0]?.[0].type).toBe("secret");
+    expect(prompt.mock.calls[0]?.[0].message).toContain("billed per token as extra usage");
     expect(credential).toStrictEqual({ type: "api_key", key: "sk-ant-oat01-pasted" });
     const resolved = await apiKey?.resolve({
       ctx: authContext(undefined),
