@@ -2,11 +2,6 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 
 import { ClaudeAuthError } from "./oauth.ts";
 
-/**
- * Anthropic accepts any loopback port, so the preferred port keeps SSH and
- * container forwarding predictable and the fallback keeps login working when
- * it is taken.
- */
 const PREFERRED_PORT = 53692;
 const DEFAULT_PORTS = [PREFERRED_PORT, 0] as const;
 const LOOPBACK_HOSTS = ["127.0.0.1", "::1"] as const;
@@ -74,12 +69,13 @@ function replyTo(request: IncomingMessage, state: string): Reply {
   }
 
   const code = url.searchParams.get("code");
-  if (!code)
+  if (!code) {
     return {
       status: 400,
       title: "Missing code",
       message: "Claude did not send an authorization code.",
     };
+  }
 
   return {
     status: 200,
@@ -104,6 +100,11 @@ function listen(host: string, port: number): Promise<Server | undefined> {
   });
 }
 
+const isPortUnavailable = (error: unknown): boolean =>
+  error instanceof Error &&
+  "code" in error &&
+  (error.code === "EADDRINUSE" || error.code === "EACCES");
+
 function closeListeners(servers: readonly Server[]): void {
   for (const server of servers) {
     if (server.listening) server.close();
@@ -121,19 +122,15 @@ async function bindFirstFree(ports: readonly number[]) {
         if (!server) continue;
         servers.push(server);
         const address = server.address();
-        if (!address || typeof address === "string")
+        if (!address || typeof address === "string") {
           throw new ClaudeAuthError("The local sign-in callback has no TCP address.");
+        }
         port = address.port;
       }
       if (servers.length) return { servers, port };
     } catch (error) {
       closeListeners(servers);
-      if (!(
-        error instanceof Error &&
-        "code" in error &&
-        (error.code === "EADDRINUSE" || error.code === "EACCES")
-      ))
-        throw error;
+      if (!isPortUnavailable(error)) throw error;
     }
   }
   throw new ClaudeAuthError(
@@ -150,8 +147,6 @@ export async function startLoopbackServer(options: LoopbackServerOptions): Promi
     throw new ClaudeAuthError("Claude sign-in was cancelled.");
   }
   const { promise, resolve, reject } = Promise.withResolvers<string>();
-  // A login cancelled before it waits for the code would otherwise leave an unhandled rejection.
-  promise.catch(() => {});
 
   const close = () => {
     clearTimeout(timer);

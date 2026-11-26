@@ -8,7 +8,6 @@ function withClaudeProvider<T extends { provider: string }>(entry: T) {
   return { ...entry, provider: CLAUDE_PROVIDER_ID };
 }
 
-/** Reuses Pi's Anthropic catalog so limits and compatibility flags track Pi releases. */
 export function claudeModels(): Model<"anthropic-messages">[] {
   return getBuiltinModels("anthropic").map((model) => {
     const copy = withClaudeProvider(model);
