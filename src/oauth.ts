@@ -26,6 +26,13 @@ export class ClaudeAuthError extends Error {
   }
 }
 
+export class InvalidPasteError extends ClaudeAuthError {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidPasteError";
+  }
+}
+
 interface TokenPayload {
   readonly access: string;
   readonly refresh?: string | undefined;
@@ -91,11 +98,21 @@ export function buildAuthorizeUrl(options: AuthorizeUrlOptions): string {
   return `${CLAUDE_AUTHORIZE_URL}?${params.toString()}`;
 }
 
+const CLOSING_WRAPPERS: Readonly<Record<string, string>> = { "<": ">", '"': '"', "'": "'" };
+
+function unwrap(value: string): string {
+  const close = CLOSING_WRAPPERS[value.charAt(0)];
+  if (close && value.length > 1 && value.endsWith(close)) {
+    return value.slice(1, -1).trim();
+  }
+  return value;
+}
+
 export function parseAuthorizationInput(input: string): {
   code?: string | undefined;
   state?: string | undefined;
 } {
-  const value = input.trim();
+  const value = unwrap(input.trim());
   if (!value) return {};
 
   const queryStart = value.indexOf("?");
@@ -109,8 +126,8 @@ export function parseAuthorizationInput(input: string): {
       );
     }
     if (params.has("client_id")) {
-      throw new ClaudeAuthError(
-        "That is the sign-in link. Open it and sign in, then paste the address you land on after signing in, not the sign-in link.",
+      throw new InvalidPasteError(
+        "That is the sign-in link. Paste the address you land on after signing in.",
       );
     }
     return {

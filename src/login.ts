@@ -18,6 +18,7 @@ import {
   createAuthorizationSession,
   exchangeAuthorizationCode,
   type FetchLike,
+  InvalidPasteError,
   parseAuthorizationInput,
 } from "./oauth.ts";
 
@@ -29,37 +30,52 @@ export interface LoginDependencies {
 function requireCode(input: string, expectedState: string): string {
   const parsed = parseAuthorizationInput(input);
   if (parsed.state !== undefined && parsed.state !== expectedState) {
-    throw new ClaudeAuthError(
-      "The pasted sign-in result belongs to a different request. Start the login again.",
-    );
+    throw new InvalidPasteError("The pasted sign-in result belongs to a different request.");
   }
   if (!parsed.code) {
-    throw new ClaudeAuthError("No authorization code was found in that sign-in result.");
+    throw new InvalidPasteError("No authorization code was found in that sign-in result.");
   }
   return parsed.code;
 }
 
-async function promptForPaste(
+async function promptForCode(
   interaction: ProviderAuthInteraction,
   prompt: AuthPrompt,
+  state: string,
 ): Promise<string> {
   const pasted = await interaction.prompt(prompt);
-  return pasted.trim() ? pasted : promptForPaste(interaction, prompt);
+  if (!pasted.trim()) {
+    return promptForCode(interaction, prompt, state);
+  }
+  try {
+    return requireCode(pasted, state);
+  } catch (error) {
+    if (!(error instanceof InvalidPasteError)) {
+      throw error;
+    }
+    interaction.notify({ type: "info", message: error.message });
+    return promptForCode(interaction, prompt, state);
+  }
 }
 
 async function readBrowserCode(
   interaction: ProviderAuthInteraction,
   server: LoopbackServer | undefined,
   placeholder: string,
+  state: string,
 ): Promise<string> {
   const dismissPrompt = new AbortController();
-  const pasted = promptForPaste(interaction, {
-    type: "manual_code",
-    message:
-      "Complete sign-in in the browser, or paste the authorization code or redirect URL here:",
-    placeholder,
-    signal: AbortSignal.any([interaction.signal, dismissPrompt.signal]),
-  });
+  const pasted = promptForCode(
+    interaction,
+    {
+      type: "manual_code",
+      message:
+        "Complete sign-in in the browser, or paste the authorization code or redirect URL here:",
+      placeholder,
+      signal: AbortSignal.any([interaction.signal, dismissPrompt.signal]),
+    },
+    state,
+  );
   if (!server) return pasted;
 
   try {
@@ -104,8 +120,7 @@ async function loginWithBrowser(
         "Complete sign-in in your browser. If the browser runs on another machine, paste the final redirect URL here.",
     });
 
-    const raw = await readBrowserCode(interaction, server, redirectUri);
-    code = requireCode(raw, state);
+    code = await readBrowserCode(interaction, server, redirectUri, state);
   } finally {
     server?.close();
   }
@@ -125,13 +140,16 @@ async function loginWithCopyCode(
     instructions: "Complete sign-in, then copy the code Anthropic shows and paste it here.",
   });
 
-  const pasted = await promptForPaste(interaction, {
-    type: "manual_code",
-    message: "Paste the code Anthropic shows after signing in:",
-    placeholder: "code#state",
-    signal: interaction.signal,
-  });
-  const code = requireCode(pasted, state);
+  const code = await promptForCode(
+    interaction,
+    {
+      type: "manual_code",
+      message: "Paste the code Anthropic shows after signing in:",
+      placeholder: "code#state",
+      signal: interaction.signal,
+    },
+    state,
+  );
   return exchangeCode(interaction, dependencies, { code, state, verifier, redirectUri });
 }
 
