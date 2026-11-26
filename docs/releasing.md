@@ -66,18 +66,20 @@ for the version in `package.json`, so a release cannot ship with an
    version and dates its changelog heading, for example by changing
    `## 0.2.0 (Unreleased)` to `## 0.2.0 (2026-12-01)`.
 2. After **CI** passes and the PR is approved, squash-merge it into `main`.
-3. The **Release** workflow runs CI on the merged commit. If npm does not have
-   the version, it stages it on npm from that commit, then creates the
+3. The **Release** workflow runs CI on the merged commit. If neither npm nor a
+   tag has the version, it stages it on npm from that commit, then creates the
    matching `vMAJOR.MINOR.PATCH` tag and GitHub release with generated notes.
-   Merges that leave the version unchanged run CI without releasing.
+   npm does not list a staged version until it is approved, so the tag is the
+   record that it was staged. Merges that leave the version unchanged, or come
+   before the staged version is approved, run CI without releasing.
 4. Approve the staged version with 2FA on npmjs.com, or run
    `npm stage list pi-claude-oauth` and `npm stage approve <stage-id>`. The
    version becomes public only after approval.
 
 If a release fails, fix the cause and rerun the failed jobs. A rerun stages the
-version only if npm still does not have it, and never touches an existing tag.
-If a tag exists for a version npm does not have, the workflow stops; delete the
-tag or release under another version.
+version only if neither npm nor a tag has it, and never touches an existing
+tag. If staging failed after the tag was created by hand, delete the tag and
+rerun.
 
 ## Workflow actions
 
