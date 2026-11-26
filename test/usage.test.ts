@@ -156,9 +156,9 @@ describe("fetchUsage", () => {
     expect(report.buckets).toHaveLength(4);
   });
 
-  it("asks for a new sign-in or token when the token is rejected", async () => {
+  it("points to /login, which wins over the environment, when the token is rejected", async () => {
     await expect(fetchUsage("token", { fetch: async () => response({}, 401) })).rejects.toThrow(
-      "Claude rejected this token for usage lookup (HTTP 401). Sign in again with /login claude or replace CLAUDE_CODE_OAUTH_TOKEN.",
+      "Claude rejected this token for usage lookup (HTTP 401). Run /login claude to sign in again or paste a new setup token.",
     );
   });
 

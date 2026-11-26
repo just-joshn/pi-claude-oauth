@@ -271,6 +271,20 @@ describe("login", () => {
     expect(calls).toHaveLength(0);
   });
 
+  it("ends the sign-in as failed, not declined, when the pasted result reports a server error", async () => {
+    const { interaction: fake, prompts } = pastingOnce(
+      "copy_code",
+      (state) => `/callback?error=temporarily_unavailable&state=${state}`,
+    );
+    const { calls, dependencies } = recordExchange();
+
+    const attempt = login(fake, dependencies);
+    await expect(attempt).rejects.toThrow(ClaudeAuthError);
+    await expect(attempt).rejects.toThrow("Claude sign-in failed: temporarily_unavailable");
+    expect(prompts.filter((prompt) => prompt.type === "manual_code")).toHaveLength(1);
+    expect(calls).toHaveLength(0);
+  });
+
   it("exchanges a copy-code result wrapped in backticks", async () => {
     const { interaction: fake } = pastingOnce("copy_code", (state) => `\`the-code#${state}\``);
     const { calls, dependencies } = recordExchange();
@@ -390,32 +404,40 @@ describe("login", () => {
     });
   });
 
-  it("accepts a pasted redirect after the browser listener times out", async () => {
-    const fake = interaction("browser");
+  it("completes sign-in from a browser redirect that arrives an hour later", async () => {
+    const { interaction: fake, events } = interaction("browser");
     const { calls, dependencies } = recordExchange();
-    const value: ProviderAuthInteraction = {
-      ...fake.interaction,
-      prompt: async (prompt) => {
-        if (prompt.type !== "manual_code") {
-          return fake.interaction.prompt(prompt);
-        }
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        const url = authUrl(fake.events);
-        const redirect = new URL(url.searchParams.get("redirect_uri") ?? "");
-        redirect.searchParams.set("code", "pasted-code");
-        redirect.searchParams.set("state", url.searchParams.get("state") ?? "");
-        await expect(fetch(redirect)).rejects.toThrow();
-        return redirect.href;
-      },
-    };
+    const started = Promise.withResolvers<void>();
 
-    await login(value, {
-      ...dependencies,
-      startServer: (options) => startLoopbackServer({ ...options, ports: [0], timeoutMs: 10 }),
-    });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    let pending: Promise<unknown>;
+    try {
+      pending = login(fake, {
+        ...dependencies,
+        startServer: async (options) => {
+          const server = await startLoopbackServer({ ...options, ports: [0] });
+          started.resolve();
+          return server;
+        },
+      });
+      await started.promise;
+      vi.advanceTimersByTime(60 * 60_000);
+    } finally {
+      vi.useRealTimers();
+    }
+    await vi.waitFor(() => authUrl(events));
 
+    const url = authUrl(events);
+    const redirect = new URL(url.searchParams.get("redirect_uri") ?? "");
+    redirect.searchParams.set("code", "late-code");
+    redirect.searchParams.set("state", url.searchParams.get("state") ?? "");
+    const response = await fetch(redirect);
+    await response.body?.cancel();
+
+    expect(response.status).toBe(200);
+    await pending;
     expect(calls).toHaveLength(1);
-    expect(calls[0]).toMatchObject({ code: "pasted-code" });
+    expect(calls[0]).toMatchObject({ code: "late-code" });
   });
 
   it("accepts a pasted redirect URL when no callback server can start", async () => {

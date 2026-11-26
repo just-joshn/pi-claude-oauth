@@ -1,9 +1,9 @@
 import { connect, createServer } from "node:net";
 import { networkInterfaces } from "node:os";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { startLoopbackServer } from "../src/callback-server.ts";
+import { type LoopbackServer, startLoopbackServer } from "../src/callback-server.ts";
 
 const STATE = "state-123";
 
@@ -74,7 +74,23 @@ describe("startLoopbackServer", () => {
       `${server.redirectUri}?error=access_denied&error_description=nope&state=${STATE}`,
     );
     expect(response.status).toBe(400);
+    expect(await response.text()).toContain("<h1>Sign-in declined</h1>");
     await declined;
+  });
+
+  it.each([
+    ["error=temporarily_unavailable", "temporarily_unavailable"],
+    ["error=server_error&error_description=Try%20again%20later", "Try again later"],
+  ])("reports the server error %s as a failed sign-in, not a decline", async (query, detail) => {
+    const server = await startLoopbackServer({ state: STATE, ports: [0] });
+    const failed = expect(server.waitForCode()).rejects.toThrow(`Claude sign-in failed: ${detail}`);
+
+    const response = await fetch(`${server.redirectUri}?${query}&state=${STATE}`);
+    expect(response.status).toBe(400);
+    const body = await response.text();
+    await failed;
+    expect(body).toContain("<h1>Sign-in failed</h1>");
+    expect(body).toContain(`<p>${detail}</p>`);
   });
 
   it("names the error when a declined authorization has an empty description", async () => {
@@ -195,9 +211,19 @@ describe("startLoopbackServer", () => {
     }
   });
 
-  it("stops listening when no browser arrives in time", async () => {
-    const server = await startLoopbackServer({ state: STATE, ports: [0], timeoutMs: 10 });
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    await expect(fetch(`${server.redirectUri}?code=abc&state=${STATE}`)).rejects.toThrow();
+  it("accepts the redirect after the user spends an hour in the browser", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    let server: LoopbackServer;
+    try {
+      server = await startLoopbackServer({ state: STATE, ports: [0] });
+      vi.advanceTimersByTime(60 * 60_000);
+    } finally {
+      vi.useRealTimers();
+    }
+    const waiting = server.waitForCode();
+
+    const response = await fetch(`${server.redirectUri}?code=late&state=${STATE}`);
+    expect(response.status).toBe(200);
+    expect(await waiting).toBe("late");
   });
 });
