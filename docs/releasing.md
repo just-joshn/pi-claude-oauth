@@ -1,6 +1,6 @@
 # Releasing pi-claude-oauth
 
-This document covers how `pi-claude-oauth` is released: the one-time npm trusted publisher setup, the `CHANGELOG.md` format, the steps to cut a release, and how workflow actions are pinned. Read it before you set up publishing, write a `CHANGELOG.md` entry, cut a release, or change an action in a workflow.
+This document covers how `pi-claude-oauth` is released: the one-time npm trusted publisher setup, the `CHANGELOG.md` format, the steps to cut a release, and how workflow actions are pinned.
 
 ## One-time npm trusted publisher setup
 

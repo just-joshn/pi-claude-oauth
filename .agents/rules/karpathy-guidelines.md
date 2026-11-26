@@ -16,8 +16,7 @@ Before implementing:
 - State your assumptions explicitly.
 - If uncertain, ask.
 - If multiple interpretations exist, present them. Do not pick silently.
-- If a simpler approach exists, say so.
-- Push back when warranted.
+- If a simpler approach exists, say so, and push back when warranted.
 - If something is unclear, stop, name what is confusing, and ask.
 
 ## 2. Simplicity First
@@ -44,7 +43,7 @@ Core rule: Touch only what you must. Clean up only your own mess.
 
 ### Surgical changes when your changes create orphans
 
-- Remove imports, variables, and functions that your own changes made unused.
+- Remove imports, variables, and functions that YOUR changes made unused.
 - Do not remove pre-existing dead code unless asked.
 
 ### Test for surgical changes

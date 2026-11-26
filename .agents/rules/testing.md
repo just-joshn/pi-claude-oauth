@@ -5,7 +5,7 @@ Purpose: testing rules for minimum test coverage, required test types, the test-
 ## Minimum test coverage
 
 - Minimum test coverage is 80%.
-- All test types below are required.
+- ALL test types below are required.
 
 | Test type         | Covers                                      |
 | ----------------- | ------------------------------------------- |
@@ -15,7 +15,7 @@ Purpose: testing rules for minimum test coverage, required test types, the test-
 
 ## Test-driven development workflow
 
-This workflow is mandatory:
+This workflow is MANDATORY:
 
 1. Write the test first. Phase: RED.
 2. Run the test. It should FAIL.

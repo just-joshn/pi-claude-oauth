@@ -2,12 +2,10 @@
 
 Purpose: coding style rules for immutability, file organization, error handling, and input validation. The file ends with a code quality checklist to run before marking work complete.
 
-## Immutability rule
+## Immutability rule (CRITICAL)
 
-This rule is critical.
-
-- Always create new objects.
-- Never mutate.
+- ALWAYS create new objects.
+- NEVER mutate.
 
 ```javascript
 // WRONG: Mutation
@@ -24,7 +22,7 @@ function updateUser(user, name) {
 
 ## File organization
 
-Many small files are better than few large files.
+MANY SMALL FILES are better than FEW LARGE FILES.
 
 - Keep cohesion high.
 - Keep coupling low.
@@ -35,7 +33,7 @@ Many small files are better than few large files.
 
 ## Error handling
 
-Always handle errors comprehensively.
+ALWAYS handle errors comprehensively.
 
 ```typescript
 try {
@@ -49,7 +47,7 @@ try {
 
 ## Input validation
 
-Always validate user input.
+ALWAYS validate user input.
 
 ```typescript
 import { z } from 'zod'

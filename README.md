@@ -1,6 +1,6 @@
 # pi-claude-oauth
 
-This README covers `pi-claude-oauth`, an extension that lets you use a Claude Pro, Max, or Ultra subscription from [Pi](https://github.com/earendil-works/pi) through Anthropic's OAuth tokens. Read it to install the extension, sign in, use the `claude` provider, review billing, terms, and security, or work on the source.
+This README covers `pi-claude-oauth`, an extension that lets you use a Claude Pro, Max, or Ultra subscription from [Pi](https://github.com/earendil-works/pi) through Anthropic's OAuth tokens. It covers installing the extension, signing in, using the `claude` provider, billing, terms, security, and working on the source.
 
 ## The claude provider
 
@@ -59,9 +59,11 @@ Pi first asks how to sign in:
 | Copy code (headless)                | Uses Anthropic's manual redirect. Asks you to paste the `code#state` value that the manual redirect shows. Runs no local server.                                                                         |
 | Import setup token from environment | Saves the `claude setup-token` token from `CLAUDE_CODE_OAUTH_TOKEN`. Pi never asks you to type or paste the token.                                                                                       |
 
-### Sign-in without a browser
+### Choose a sign-in method
 
 Prefer the **Browser sign-in** method when you sign in interactively.
+
+### Sign-in without a browser
 
 For containers, CI, or any environment without a browser, export a setup token before starting Pi:
 

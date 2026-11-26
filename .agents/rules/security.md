@@ -4,9 +4,9 @@ Purpose: security rules for the mandatory checks before any commit, secret manag
 
 ## Mandatory security checks
 
-These checks are mandatory before any commit:
+Before ANY commit, check:
 
-- [ ] No hardcoded secrets: API keys, passwords, tokens.
+- [ ] No hardcoded secrets, such as API keys, passwords, and tokens.
 - [ ] All user inputs are validated.
 - [ ] SQL injection is prevented with parameterized queries.
 - [ ] XSS is prevented with sanitized HTML.
@@ -17,9 +17,6 @@ These checks are mandatory before any commit:
 - [ ] Error messages do not leak sensitive data.
 
 ## Secret management
-
-- Never hardcode secrets.
-- Always use environment variables.
 
 ```typescript
 // NEVER: Hardcoded secrets
@@ -34,7 +31,7 @@ if (!apiKey) throw new Error('API_KEY not configured')
 
 If a security issue is found:
 
-1. Stop immediately.
+1. STOP immediately.
 2. Use the `security-reviewer` agent.
 3. Fix CRITICAL issues before continuing.
 4. Rotate any exposed secrets.
