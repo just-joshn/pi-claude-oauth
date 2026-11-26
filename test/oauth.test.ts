@@ -78,6 +78,26 @@ describe("createAuthorizationSession", () => {
 });
 
 describe("parseAuthorizationInput", () => {
+  const signInLink = buildAuthorizeUrl({
+    redirectUri: CLAUDE_COPY_CODE_REDIRECT_URI,
+    state: "Inhxz90bfKf88trinuNTh1G9RVnHKZxhYcd6FSx40G0",
+    challenge: "b5-JsMYhCmV6uO0SUHskQmW3pZ8vT2nA7cD9eF1gH4j",
+  });
+
+  it.each(["Ab3_xY9=", "Ab3=xY9", "Ab3xY9="])("reads the bare code %s", (input) => {
+    expect(parseAuthorizationInput(input, signInLink)).toEqual({ code: input });
+  });
+
+  it.each([
+    signInLink.slice(signInLink.indexOf("/authorize"), signInLink.indexOf("client_id") + 7),
+    signInLink.slice(signInLink.indexOf("code_challenge=") - 20, signInLink.indexOf("&state")),
+    signInLink.slice(signInLink.indexOf("state=") + 6),
+  ])("rejects the fragment %s of the sign-in link shown for this login", (input) => {
+    expect(() => parseAuthorizationInput(` ${input} `, signInLink)).toThrow(
+      "That is the sign-in link. Paste the address you land on after signing in.",
+    );
+  });
+
   it("reads a full redirect URL", () => {
     expect(
       parseAuthorizationInput("https://platform.claude.com/oauth/code/callback?code=abc&state=def"),

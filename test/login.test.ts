@@ -243,6 +243,39 @@ describe("login", () => {
     expect(calls[0]).toMatchObject({ code: "the-code" });
   });
 
+  it("asks again when a fragment of this login's sign-in link is pasted", async () => {
+    let link = "";
+    let pastes = 0;
+    const notices: string[] = [];
+    const fake: ProviderAuthInteraction = {
+      signal: new AbortController().signal,
+      notify: (event) => {
+        if (event.type === "auth_url") {
+          link = event.url;
+        }
+        if (event.type === "info") {
+          notices.push(event.message);
+        }
+      },
+      prompt: async (prompt) => {
+        if (prompt.type === "select") {
+          return "copy_code";
+        }
+        pastes += 1;
+        return pastes === 1 ? link.slice(link.indexOf("state=") + 6) : "the-code";
+      },
+    };
+    const { calls, dependencies } = recordExchange();
+
+    await login(fake, dependencies);
+
+    expect(notices).toEqual([
+      "That is the sign-in link. Paste the address you land on after signing in.",
+    ]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ code: "the-code" });
+  });
+
   it("ends the sign-in when the pasted result reports a denial", async () => {
     const { interaction: fake, prompts } = interaction("copy_code", [
       "/callback?error=access_denied",
