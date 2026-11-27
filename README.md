@@ -200,6 +200,7 @@ npm run bench          # measure offline copy-code sign-in with and without past
 npm run audit          # fail on high or critical dependency advisories
 npm run pack:check     # list the files that would ship
 npm run test:package   # install the tarball in a temporary directory and load it in offline Pi
+npm run test:package -- path/to/package.tgz # load a specific tarball instead of packing
 npm run dev            # load this checkout in Pi
 ```
 
@@ -208,6 +209,10 @@ If Pi has no configured model, use `/login` before sending a prompt. `npm run de
 ### Versioning
 
 Before 1.0, releases can contain breaking changes. Check the `BREAKING CHANGES` section in [CHANGELOG.md](CHANGELOG.md) before upgrading.
+
+### Releasing
+
+See [how to stage and approve npm releases](https://github.com/just-joshn/pi-claude-oauth/blob/main/docs/releasing.md).
 
 ### Source layout
 
