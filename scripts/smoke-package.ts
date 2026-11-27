@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import manifest from "../package.json" with { type: "json" };
@@ -9,7 +9,8 @@ const npm = process.env.npm_execpath;
 assert.ok(npm, "Run this script through npm run test:package");
 const cwd = process.cwd();
 const temp = mkdtempSync(join(tmpdir(), "pi-package-"));
-const host = `@earendil-works/pi-coding-agent@${manifest.devDependencies["@earendil-works/pi-coding-agent"]}`;
+const hostVersions = ["1.6.0", manifest.devDependencies["@earendil-works/pi-coding-agent"]];
+const hostPackages = ["@earendil-works/pi-coding-agent", "@earendil-works/pi-ai", "@earendil-works/pi-tui"];
 
 try {
 	execFileSync(process.execPath, [npm, "pack", "--ignore-scripts", "--pack-destination", temp], {
@@ -21,38 +22,42 @@ try {
 	assert.equal(tarballs.length, 1, "Expected exactly one packed tarball");
 	const tarball = tarballs[0];
 	assert.ok(tarball);
-	writeFileSync(join(temp, "package.json"), '{"private":true,"type":"module"}\n', { mode: 0o600 });
-	execFileSync(
-		process.execPath,
-		[
-			npm,
-			"install",
-			"--ignore-scripts",
-			"--omit=dev",
-			"--no-audit",
-			"--no-fund",
-			"--save-exact",
-			host,
-			join(temp, tarball),
-		],
-		{ cwd: temp, stdio: "inherit", timeout: 180_000 },
-	);
-	copyFileSync(resolve(cwd, "scripts/smoke-installed.ts"), join(temp, "smoke-installed.ts"));
-	execFileSync(process.execPath, [join(temp, "smoke-installed.ts"), manifest.name], {
-		cwd: temp,
-		stdio: "inherit",
-		timeout: 30_000,
-		env: {
-			PATH: process.env.PATH,
-			HOME: temp,
-			USERPROFILE: temp,
-			SystemRoot: process.env.SystemRoot,
-			TEMP: temp,
-			TMP: temp,
-			PI_OFFLINE: "1",
-			PI_CODING_AGENT_DIR: join(temp, ".pi-agent"),
-		},
-	});
+	for (const version of hostVersions) {
+		const installDir = join(temp, version);
+		mkdirSync(installDir);
+		writeFileSync(join(installDir, "package.json"), '{"private":true,"type":"module"}\n', { mode: 0o600 });
+		execFileSync(
+			process.execPath,
+			[
+				npm,
+				"install",
+				"--ignore-scripts",
+				"--omit=dev",
+				"--no-audit",
+				"--no-fund",
+				"--save-exact",
+				...hostPackages.map((name) => `${name}@${version}`),
+				join(temp, tarball),
+			],
+			{ cwd: installDir, stdio: "inherit", timeout: 180_000 },
+		);
+		copyFileSync(resolve(cwd, "scripts/smoke-installed.ts"), join(installDir, "smoke-installed.ts"));
+		execFileSync(process.execPath, [join(installDir, "smoke-installed.ts"), manifest.name, version], {
+			cwd: installDir,
+			stdio: "inherit",
+			timeout: 30_000,
+			env: {
+				PATH: process.env.PATH,
+				HOME: installDir,
+				USERPROFILE: installDir,
+				SystemRoot: process.env.SystemRoot,
+				TEMP: installDir,
+				TMP: installDir,
+				PI_OFFLINE: "1",
+				PI_CODING_AGENT_DIR: join(installDir, ".pi-agent"),
+			},
+		});
+	}
 } finally {
 	rmSync(temp, { recursive: true, force: true, maxRetries: 3 });
 }
