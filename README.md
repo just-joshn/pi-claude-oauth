@@ -14,7 +14,7 @@ The extension registers a native Pi provider named `claude`. The `claude` provid
 
 ## Requirements
 
-- Pi 1.6.0 or newer. The package smoke test uses Pi 1.6.1.
+- Pi 1.6.0 or newer. CI loads the packed extension with the minimum and the pinned development version of Pi.
 - Node.js on Linux or macOS. Use 22.23.5 or newer in the 22.x series, 24.22.3 or newer in the 24.x series, or 26.13.1 or newer in the 26.x series. CI also runs on Windows.
 - A Claude Pro, Max, or Ultra subscription with Claude Code access.
 
@@ -133,7 +133,8 @@ Treat subscription OAuth as an account-level credential, not as a way to move pl
 - The extension never writes tokens anywhere else.
 - Access and refresh tokens are never logged.
 - Error messages include the HTTP status or Anthropic's OAuth error code.
-- Error messages redact the submitted code, state, PKCE verifier, or refresh token.
+- Error messages redact the submitted code, state, PKCE verifier, or refresh token and remove terminal control characters from provider diagnostics.
+- Token and usage responses are limited to 256 KiB.
 
 ### OAuth callback and PKCE
 

@@ -2,6 +2,15 @@
 
 This changelog is for people who install the package. It lists, for each version, the changes that reach them, one change per entry. A version with no user-facing changes of its own has no sections; a short note under its heading says so. CI, tests, tooling and other changes that never reach the npm package stay out of it.
 
+## 0.2.1 (2026-11-26)
+
+FIXED:
+
+- Claude sign-in ignores pasted input that arrives after cancellation or after the browser callback completes.
+- Headless `/claude` reports errors through Pi without writing to JSON output.
+- Token and usage lookups cancel responses larger than 256 KiB.
+- Provider messages and usage labels no longer pass terminal control characters through to Pi.
+
 ## 0.2.0 (2026-11-26)
 
 BREAKING CHANGES:
