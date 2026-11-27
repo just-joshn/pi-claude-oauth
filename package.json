@@ -6,6 +6,10 @@
 	"keywords": [
 		"pi-package"
 	],
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/just-joshn/pi-claude-oauth.git"
+	},
 	"files": [
 		"src/",
 		"README.md",
