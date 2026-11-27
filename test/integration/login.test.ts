@@ -479,6 +479,72 @@ describe("login", () => {
 		});
 	});
 
+	it.each(["copy_code", "browser"])("ignores a paste that resolves after %s sign-in is cancelled", async (method) => {
+		const { interaction: base, controller, events, prompts } = interaction(method);
+		const { calls, dependencies } = recordExchange();
+		const entered = Promise.withResolvers<void>();
+		const answer = Promise.withResolvers<string>();
+		const fake: ProviderAuthInteraction = {
+			...base,
+			prompt: (prompt) => {
+				if (prompt.type !== "manual_code") return base.prompt(prompt);
+				prompts.push(prompt);
+				if (prompts.filter((entry) => entry.type === "manual_code").length > 1) {
+					return Promise.reject(new Error("Unexpected retry"));
+				}
+				entered.resolve();
+				return answer.promise;
+			},
+		};
+		const pending = login(fake, {
+			...dependencies,
+			startServer: async () => {
+				throw new Error("no server");
+			},
+		});
+		await entered.promise;
+		controller.abort();
+		answer.resolve("the-code#other-state");
+
+		await expect(pending).rejects.toBeDefined();
+		expect(prompts.filter((prompt) => prompt.type === "manual_code")).toHaveLength(1);
+		expect(events.some((event) => event.type === "info")).toBe(false);
+		expect(calls).toHaveLength(0);
+	});
+
+	it("ignores a late invalid paste after the browser callback completes", async () => {
+		const { interaction: base, events, prompts } = interaction("browser");
+		const { calls, dependencies } = recordExchange();
+		const answer = Promise.withResolvers<string>();
+		const fake: ProviderAuthInteraction = {
+			...base,
+			prompt: (prompt) => {
+				if (prompt.type !== "manual_code") return base.prompt(prompt);
+				prompts.push(prompt);
+				if (prompts.filter((entry) => entry.type === "manual_code").length > 1) {
+					return Promise.reject(new Error("Unexpected retry"));
+				}
+				return answer.promise;
+			},
+		};
+		await login(fake, {
+			...dependencies,
+			startServer: async () => ({
+				redirectUri: "http://localhost:1234/callback",
+				waitForCode: async () => "callback-code",
+				close: () => {},
+			}),
+		});
+		answer.resolve("the-code#other-state");
+		await answer.promise;
+		await Promise.resolve();
+
+		expect(prompts.filter((prompt) => prompt.type === "manual_code")).toHaveLength(1);
+		expect(events.some((event) => event.type === "info")).toBe(false);
+		expect(calls).toHaveLength(1);
+		expect(calls[0]).toMatchObject({ code: "callback-code" });
+	});
+
 	it("cancels the login when the user aborts", async () => {
 		const { interaction: fake, controller, events } = interaction("browser");
 		const pending = login(fake, {

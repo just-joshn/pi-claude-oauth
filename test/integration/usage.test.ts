@@ -59,6 +59,14 @@ describe("parseUsage", () => {
 		]);
 	});
 
+	it("removes terminal controls from model names shown in usage cards", () => {
+		const decoratedName = `${String.fromCharCode(27)}[31mFable${String.fromCharCode(27)}[0m`;
+		const report = parseUsage({
+			limits: [{ kind: "weekly_scoped", percent: 2, scope: { model: { display_name: decoratedName } } }],
+		});
+		expect(formatUsage(report)).toEqual(["7-day Fable: 2%"]);
+	});
+
 	it("skips scoped weekly limits without a usable percent", () => {
 		const payload = {
 			five_hour: { utilization: 1 },

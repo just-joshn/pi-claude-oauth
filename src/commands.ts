@@ -3,6 +3,7 @@ import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-c
 import { CLAUDE_CODE_OAUTH_TOKEN_ENV } from "./credential.ts";
 import { CLAUDE_PROVIDER_ID, CLAUDE_PROVIDER_NAME } from "./models.ts";
 import { isRecord } from "./oauth.ts";
+import { terminalText } from "./terminal-text.ts";
 import { fetchUsage, formatUsage, type UsageReport } from "./usage.ts";
 
 export const CLAUDE_CARD_TYPE = "claude-card";
@@ -116,7 +117,7 @@ function describeError(error: unknown): string {
 	let text = "";
 	let current: unknown = error;
 	do {
-		const message = current instanceof Error ? current.message : String(current);
+		const message = terminalText(current instanceof Error ? current.message : String(current));
 		if (!text.includes(message)) {
 			text = text ? `${text}: ${message}` : message;
 		}
@@ -149,12 +150,16 @@ async function showUsage(
 		// `getApiKeyForProvider` swallows refresh errors and would report "not signed in".
 		const accessToken = (await registry.getProviderAuth(CLAUDE_PROVIDER_ID))?.auth.apiKey;
 		if (!accessToken) {
-			ui?.notify(`No Claude sign-in found. Run /login ${CLAUDE_PROVIDER_ID} first.`, "warning");
+			const message = `No Claude sign-in found. Run /login ${CLAUDE_PROVIDER_ID} first.`;
+			if (!ui) throw new Error(message);
+			ui.notify(message, "warning");
 			return;
 		}
 		pi.appendEntry(CLAUDE_CARD_TYPE, usageCard(await fetchUsage(accessToken)));
 	} catch (error) {
-		ui?.notify(describeError(error), "error");
+		const message = describeError(error);
+		if (!ui) throw new Error(message, { cause: error });
+		ui.notify(message, "error");
 	} finally {
 		ui?.setStatus("claude-usage", undefined);
 	}
@@ -187,8 +192,11 @@ export function registerClaudeCommand(pi: CommandHost): void {
 				case "logout":
 					ui?.notify(`Run /logout, then choose ${CLAUDE_PROVIDER_NAME}.`, "info");
 					return;
-				default:
-					ui?.notify(`Unknown /claude subcommand "${subcommand}". Use status, usage, login, or logout.`, "error");
+				default: {
+					const message = `Unknown /claude subcommand "${terminalText(subcommand)}". Use status, usage, login, or logout.`;
+					if (!ui) throw new Error(message);
+					ui.notify(message, "error");
+				}
 			}
 		},
 	});
