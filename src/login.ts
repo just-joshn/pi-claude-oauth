@@ -46,8 +46,11 @@ async function promptForCode(
 	prompt: AuthPrompt,
 	pending: PendingSignIn,
 ): Promise<string> {
+	const signal = prompt.signal ?? interaction.signal;
 	while (true) {
+		signal.throwIfAborted();
 		const pasted = await interaction.prompt(prompt);
+		signal.throwIfAborted();
 		if (!pasted.trim()) continue;
 		try {
 			return requireCode(pasted, pending);

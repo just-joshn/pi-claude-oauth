@@ -10,6 +10,7 @@ import {
 	ClaudeAuthError,
 	createAuthorizationSession,
 	exchangeAuthorizationCode,
+	fetchJsonWithDeadline,
 	parseAuthorizationInput,
 	parseTokenPayload,
 	refreshAccessToken,
@@ -372,6 +373,71 @@ describe("refreshAccessToken", () => {
 					),
 			}),
 		).rejects.toThrow("Claude sign-in failed (HTTP 400): invalid_request: bad refresh_token=[redacted].");
+	});
+});
+
+describe("untrusted response boundaries", () => {
+	it("rejects oversized streamed token and usage responses and cancels the reader", async () => {
+		for (const url of [CLAUDE_TOKEN_URL, "https://api.anthropic.com/api/oauth/usage"]) {
+			let cancelled = false;
+			let chunks = 0;
+			const body = new ReadableStream<Uint8Array>({
+				pull(controller) {
+					if (chunks++ === 6) controller.close();
+					else controller.enqueue(new Uint8Array(65536).fill(32));
+				},
+				cancel() {
+					cancelled = true;
+				},
+			});
+			await expect(
+				fetchJsonWithDeadline(
+					url,
+					{},
+					{
+						timeoutMs: 1000,
+						fetch: async () => new Response(body, { headers: { "content-length": "1" } }),
+					},
+				),
+			).rejects.toThrow(/too large/i);
+			expect(cancelled).toBe(true);
+		}
+	});
+
+	it("decodes UTF-8 split across response chunks", async () => {
+		const bytes = new TextEncoder().encode('{"message":"café"}');
+		const body = new ReadableStream<Uint8Array>({
+			start(controller) {
+				controller.enqueue(bytes.slice(0, bytes.length - 3));
+				controller.enqueue(bytes.slice(bytes.length - 3));
+				controller.close();
+			},
+		});
+		await expect(
+			fetchJsonWithDeadline(
+				"https://example.test",
+				{},
+				{
+					timeoutMs: 1000,
+					fetch: async () => new Response(body),
+				},
+			),
+		).resolves.toMatchObject({ payload: { message: "café" } });
+	});
+
+	it("strips terminal controls from callback and token diagnostics after redaction", async () => {
+		expect(parseAuthorizationInput("error=access_denied&error_description=Denied%1B%5B31m%07%C2%9B").failure).toBe(
+			"Claude sign-in was declined: Denied",
+		);
+		await expect(
+			exchangeAuthorizationCode(grant, {
+				signal: signal(),
+				fetch: async () => json({ error: "bad\u001b[31m", error_description: `secret ${grant.code}\u0007` }, 400),
+			}),
+		).rejects.toThrow("Claude sign-in failed (HTTP 400): bad: secret [redacted].");
+		expect(() => parseTokenPayload({ access_token: "a", token_type: "bad\u001b[31m\u0007" })).toThrow(
+			'Claude token response used unsupported token type "bad".',
+		);
 	});
 });
 

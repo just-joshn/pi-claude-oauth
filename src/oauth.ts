@@ -1,3 +1,5 @@
+import { terminalText } from "./terminal-text.ts";
+
 export const CLAUDE_AUTHORIZE_URL = "https://claude.com/cai/oauth/authorize";
 export const CLAUDE_TOKEN_URL = "https://platform.claude.com/v1/oauth/token";
 export const CLAUDE_COPY_CODE_REDIRECT_URI = "https://platform.claude.com/oauth/code/callback";
@@ -12,6 +14,7 @@ export const CLAUDE_TOKEN_PREFIX = "sk-ant-oat";
 
 const AUTHORIZE_PATH = "/oauth/authorize";
 const TOKEN_TIMEOUT_MS = 30_000;
+const MAX_RESPONSE_BYTES = 256 * 1024;
 const DEFAULT_TOKEN_LIFETIME_SECONDS = 3_600;
 
 export type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
@@ -22,6 +25,8 @@ export class ClaudeAuthError extends Error {
 		this.name = "ClaudeAuthError";
 	}
 }
+
+class OversizedResponseError extends ClaudeAuthError {}
 
 export class InvalidPasteError extends ClaudeAuthError {
 	constructor(message: string) {
@@ -117,7 +122,7 @@ export function authorizationFailure(
 	if (!error) {
 		return undefined;
 	}
-	const detail = params.get("error_description") || error;
+	const detail = terminalText(params.get("error_description") || error);
 	if (error === "access_denied") {
 		return { title: "Sign-in declined", detail, message: `Claude sign-in was declined: ${detail}` };
 	}
@@ -172,7 +177,7 @@ export function parseTokenPayload(value: unknown): TokenPayload {
 
 	const tokenType = value.token_type;
 	if (typeof tokenType === "string" && tokenType.toLowerCase() !== "bearer") {
-		throw new ClaudeAuthError(`Claude token response used unsupported token type "${tokenType}".`);
+		throw new ClaudeAuthError(`Claude token response used unsupported token type "${terminalText(tokenType)}".`);
 	}
 
 	const expiresIn =
@@ -224,7 +229,9 @@ function describeFailure(status: number, payload: unknown, sent: Record<string, 
 	if (status === 429) {
 		return "Claude is rate limiting sign-in (HTTP 429). Wait a moment and try again.";
 	}
-	const detail = redact([code, description].filter((part): part is string => Boolean(part)).join(": "), sent);
+	const detail = terminalText(
+		redact([code, description].filter((part): part is string => Boolean(part)).join(": "), sent),
+	);
 	return `Claude sign-in failed (HTTP ${status})${detail ? `: ${detail}` : ""}.`;
 }
 
@@ -236,6 +243,28 @@ function parseJson(text: string): unknown {
 		return JSON.parse(text);
 	} catch {
 		return undefined;
+	}
+}
+
+async function readResponseText(response: Response): Promise<string> {
+	if (!response.body) return "";
+	const reader = response.body.getReader();
+	const decoder = new TextDecoder();
+	let bytes = 0;
+	let text = "";
+	try {
+		while (true) {
+			const chunk = await reader.read();
+			if (chunk.done) return text + decoder.decode();
+			bytes += chunk.value.byteLength;
+			if (bytes > MAX_RESPONSE_BYTES) {
+				void reader.cancel().catch(() => {});
+				throw new OversizedResponseError("Claude response was too large.");
+			}
+			text += decoder.decode(chunk.value, { stream: true });
+		}
+	} finally {
+		reader.releaseLock();
 	}
 }
 
@@ -252,8 +281,9 @@ export async function fetchJsonWithDeadline(
 			void response.body?.cancel().catch(() => {});
 			return { ok: false, status: response.status, payload: undefined };
 		}
-		return { ok: response.ok, status: response.status, payload: parseJson(await response.text()) };
+		return { ok: response.ok, status: response.status, payload: parseJson(await readResponseText(response)) };
 	} catch (error) {
+		if (error instanceof OversizedResponseError) throw error;
 		if (!signal.aborted) throw new ClaudeAuthError(`Could not reach ${url}.`, { cause: error });
 		// Pi bounds a refresh with `AbortSignal.timeout`, so an aborted caller signal is not always a user cancel.
 		if (isTimeout(signal)) {

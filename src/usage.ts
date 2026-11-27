@@ -1,5 +1,6 @@
 import { CLAUDE_PROVIDER_ID } from "./models.ts";
 import { CLAUDE_OAUTH_BETA, ClaudeAuthError, type FetchLike, fetchJsonWithDeadline, isRecord } from "./oauth.ts";
+import { terminalText } from "./terminal-text.ts";
 
 export const CLAUDE_USAGE_URL = "https://api.anthropic.com/api/oauth/usage";
 
@@ -41,7 +42,7 @@ function scopedWeeklyBucket(limit: unknown): UsageBucket | undefined {
 		return undefined;
 	}
 	return {
-		label: `7-day ${name}`,
+		label: `7-day ${terminalText(name)}`,
 		utilization: clampPercent(percent),
 		resetsAt: typeof limit.resets_at === "string" ? limit.resets_at : undefined,
 	};

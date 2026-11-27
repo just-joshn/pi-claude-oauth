@@ -160,7 +160,7 @@ describe("/claude command", () => {
 
 	it("reports why the saved sign-in could not be used", async () => {
 		const authError = new Error("OAuth refresh failed for claude", {
-			cause: new Error("This Claude token cannot be refreshed."),
+			cause: new Error("This Claude token cannot be refreshed.\u001b[0m"),
 		});
 		const { cards, notifications, command } = harness();
 		await command.handler("usage", context(notifications, { authError }));
@@ -254,13 +254,22 @@ describe("/claude command", () => {
 
 		await command.handler("login", ctx);
 		await command.handler("logout", ctx);
-		await command.handler("bogus", ctx);
-		await command.handler("usage", ctx);
-		await command.handler("usage", {
-			...context(notifications, { accessToken: undefined }),
-			hasUI: false,
-			ui,
-		});
+		await expect(command.handler("bogus", ctx)).rejects.toThrow('Unknown /claude subcommand "bogus"');
+		await expect(command.handler("usage", ctx)).rejects.toThrow(/\/login claude/);
+		await expect(
+			command.handler("usage", {
+				...context(notifications, { accessToken: undefined }),
+				hasUI: false,
+				ui,
+			}),
+		).rejects.toThrow("No Claude sign-in found. Run /login claude first.");
+		await expect(
+			command.handler("usage", {
+				...context(notifications, { authError: new Error("refresh failed", { cause: new Error("offline") }) }),
+				hasUI: false,
+				ui,
+			}),
+		).rejects.toThrow("refresh failed: offline");
 
 		expect(cards).toHaveLength(0);
 		expect(ui.notify).not.toHaveBeenCalled();
