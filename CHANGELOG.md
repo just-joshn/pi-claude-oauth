@@ -2,6 +2,10 @@
 
 This changelog is for people who install the package. It lists, for each version, the changes that reach them, one change per entry. A version with no user-facing changes of its own has no sections; a short note under its heading says so. CI, tests, tooling and other changes that never reach the npm package stay out of it.
 
+## 0.2.2 (2026-11-27)
+
+No changes to the Pi extension.
+
 ## 0.2.1 (2026-11-26)
 
 FIXED:
