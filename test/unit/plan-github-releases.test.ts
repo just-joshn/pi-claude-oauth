@@ -58,12 +58,25 @@ describe("plan GitHub releases from npm", () => {
 		).toEqual([]);
 	});
 
+	it("accepts valid prerelease and build identifiers without planning them", () => {
+		const latest = "0.2.2-0.19.01beta.alpha-beta+001.build";
+		const versions = ["0.2.1", "0.2.2+01", latest];
+		expect(missingReleases({ "dist-tags.latest": latest, versions }, [[]])).toEqual({
+			latest,
+			versions: ["0.2.1"],
+		});
+	});
+
 	it("rejects malformed registry and GitHub release data", () => {
 		const registry = { "dist-tags.latest": "0.2.1", versions: ["0.2.1"] };
 		for (const versions of [
 			["0.2.1", null],
 			["0.2.1", "not-a-version"],
 			["0.2.1", "01.2.3"],
+			["0.2.1", "0.2.2-01"],
+			["0.2.1", "0.2.2-beta.00+build"],
+			["0.2.1", "0.2.2-beta..1"],
+			["0.2.1", "0.2.2+build..1"],
 		]) {
 			expect(() => missingReleases({ ...registry, versions }, [[]])).toThrow();
 		}

@@ -13,7 +13,7 @@ const signer = `URI:${repository}/.github/workflows/stage-npm.yml@refs/heads/mai
 const provenance = "https://slsa.dev/provenance/v1";
 const stableVersion = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
 const versionPattern =
-	/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-((?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+	/^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const firstVersion = "0.2.1";
 const batchSize = 10;
 
@@ -45,14 +45,19 @@ function compareVersions(a: string, b: string): number {
 	return 0;
 }
 
+function isVersion(value: unknown): value is string {
+	if (typeof value !== "string") return false;
+	const match = versionPattern.exec(value);
+	if (!match) return false;
+	const prerelease = match[1];
+	return prerelease === undefined || !prerelease.split(".").some((identifier) => /^0[0-9]+$/.test(identifier));
+}
+
 export function missingReleases(registry: unknown, releases: unknown): { versions: string[]; latest: string } {
 	const latest = field(registry, "dist-tags.latest");
-	assert.ok(typeof latest === "string" && versionPattern.test(latest), "npm must report a valid latest tag");
+	assert.ok(isVersion(latest), "npm must report a valid latest tag");
 	const registryVersions = array(field(registry, "versions"));
-	assert.ok(
-		registryVersions.every((version) => typeof version === "string" && versionPattern.test(version)),
-		"Invalid npm version",
-	);
+	assert.ok(registryVersions.every(isVersion), "Invalid npm version");
 	assert.ok(registryVersions.includes(latest), "npm latest tag is not in versions");
 	const released = new Set(
 		array(releases)
@@ -68,11 +73,8 @@ export function missingReleases(registry: unknown, releases: unknown): { version
 			}),
 	);
 	const versions = registryVersions.filter(
-		(version): version is string =>
-			typeof version === "string" &&
-			stableVersion.test(version) &&
-			compareVersions(version, firstVersion) >= 0 &&
-			!released.has(`v${version}`),
+		(version) =>
+			stableVersion.test(version) && compareVersions(version, firstVersion) >= 0 && !released.has(`v${version}`),
 	);
 	return { versions: [...new Set(versions)].sort(compareVersions).slice(0, batchSize), latest };
 }
